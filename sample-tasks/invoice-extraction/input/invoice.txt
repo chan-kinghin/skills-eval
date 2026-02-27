@@ -1,0 +1,29 @@
+INVOICE
+
+Company: TechBridge Solutions Ltd.
+Invoice Number: INV-2026-0847
+Date: 2026-02-15
+Due Date: 2026-03-17
+
+Bill To:
+  GreenLeaf Enterprises
+  Attn: Sarah Chen
+  45 Innovation Drive, Suite 300
+  San Francisco, CA 94105
+
+Items:
+  1. Cloud Infrastructure Setup (40 hours @ $150/hr)     $6,000.00
+  2. API Integration Development (25 hours @ $175/hr)    $4,375.00
+  3. Security Audit & Compliance Review (lump sum)       $2,500.00
+  4. Project Management (15 hours @ $125/hr)             $1,875.00
+
+                                          Subtotal:    $14,750.00
+                                          Tax (8.5%):   $1,253.75
+                                          Total:       $16,003.75
+
+Payment Terms: Net 30
+Bank: First National Bank
+Account: 4821-7756-9903
+Routing: 021000021
+
+Notes: Phase 1 of 3. Next invoice expected April 2026.

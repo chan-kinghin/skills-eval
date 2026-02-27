@@ -1,0 +1,112 @@
+# SkillEval Default Model Catalog
+# Pricing is approximate (per million tokens, USD). Update as providers change rates.
+# Models are accessed via OpenAI-compatible chat completion API.
+# Last updated: February 2026
+
+# =============================================================================
+# QWEN (Alibaba Cloud / DashScope)
+# Signup: https://dashscope.console.aliyun.com/
+# Env var: DASHSCOPE_API_KEY
+# =============================================================================
+
+# Frontier — Alibaba's flagship, best quality for complex document tasks
+- name: qwen-max
+  provider: dashscope
+  endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+  input_cost_per_m: 1.60
+  output_cost_per_m: 6.40
+  env_key: DASHSCOPE_API_KEY
+  context_window: 131072
+
+# Mid — Strong balance of quality and cost, handles most document tasks well
+- name: qwen-plus
+  provider: dashscope
+  endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+  input_cost_per_m: 0.40
+  output_cost_per_m: 1.20
+  env_key: DASHSCOPE_API_KEY
+  context_window: 131072
+
+# Budget — Fast and cheap, good for simple extraction tasks
+- name: qwen-turbo
+  provider: dashscope
+  endpoint: https://dashscope.aliyuncs.com/compatible-mode/v1
+  input_cost_per_m: 0.05
+  output_cost_per_m: 0.20
+  env_key: DASHSCOPE_API_KEY
+  context_window: 131072
+
+# =============================================================================
+# GLM (Zhipu AI / 智谱AI)
+# Signup: https://open.bigmodel.cn/
+# Env var: ZHIPU_API_KEY
+# =============================================================================
+
+# Frontier — Zhipu's latest flagship (Feb 2026), strongest reasoning
+- name: glm-5
+  provider: zhipu
+  endpoint: https://open.bigmodel.cn/api/paas/v4
+  input_cost_per_m: 1.00
+  output_cost_per_m: 3.20
+  env_key: ZHIPU_API_KEY
+  context_window: 131072
+
+# Mid — Previous-gen flagship, still very capable for document processing
+- name: glm-4.5
+  provider: zhipu
+  endpoint: https://open.bigmodel.cn/api/paas/v4
+  input_cost_per_m: 0.60
+  output_cost_per_m: 2.20
+  env_key: ZHIPU_API_KEY
+  context_window: 131072
+
+# Mid-Low — Lightweight 4.5 variant, cheaper than full 4.5
+- name: glm-4.5-air
+  provider: zhipu
+  endpoint: https://open.bigmodel.cn/api/paas/v4
+  input_cost_per_m: 0.15
+  output_cost_per_m: 0.55
+  env_key: ZHIPU_API_KEY
+  context_window: 131072
+
+# Budget — Free tier, great for high-volume low-stakes tasks
+- name: glm-4.5-flash
+  provider: zhipu
+  endpoint: https://open.bigmodel.cn/api/paas/v4
+  input_cost_per_m: 0.00
+  output_cost_per_m: 0.00
+  env_key: ZHIPU_API_KEY
+  context_window: 131072
+
+# =============================================================================
+# MINIMAX
+# Signup: https://platform.minimax.io/
+# Env var: MINIMAX_API_KEY
+# =============================================================================
+
+# Frontier — MiniMax's latest, strong document understanding
+- name: MiniMax-M2.5
+  provider: minimax
+  endpoint: https://api.minimax.io/v1
+  input_cost_per_m: 0.30
+  output_cost_per_m: 1.20
+  env_key: MINIMAX_API_KEY
+  context_window: 204800
+
+# Mid — Solid previous-gen model, good cost/quality tradeoff
+- name: MiniMax-M2
+  provider: minimax
+  endpoint: https://api.minimax.io/v1
+  input_cost_per_m: 0.26
+  output_cost_per_m: 1.00
+  env_key: MINIMAX_API_KEY
+  context_window: 204800
+
+# Budget — Older model, cheapest MiniMax option
+- name: MiniMax-Text-01
+  provider: minimax
+  endpoint: https://api.minimax.io/v1
+  input_cost_per_m: 0.20
+  output_cost_per_m: 1.10
+  env_key: MINIMAX_API_KEY
+  context_window: 204800

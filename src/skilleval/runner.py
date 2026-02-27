@@ -1,0 +1,494 @@
+"""Mode orchestrators for SkillEval evaluation runs."""
+
+from __future__ import annotations
+
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+from skilleval.comparators import get_comparator
+from skilleval.comparators.base import strip_markdown_fences, strip_reasoning_tags
+from skilleval.display import console, create_progress
+from skilleval.documents import format_input_files, input_descriptions
+from skilleval.engine import ExecutionEngine, TrialSpec
+from skilleval.models import (
+    ChainCell,
+    MatrixCell,
+    ModelEntry,
+    ModelResult,
+    RunSummary,
+    TaskFolder,
+    TrialResult,
+)
+from skilleval.results import ResultWriter
+
+
+def _clean_output(text: str) -> str:
+    """Strip reasoning tags, whitespace, and markdown fences from model output.
+
+    Handles reasoning models (MiniMax, DeepSeek-R1) that wrap chain-of-thought
+    in <think> tags, and models that wrap output in ```json fences.
+    """
+    text = strip_reasoning_tags(text)
+    text = strip_markdown_fences(text.strip())
+    return text.strip()
+
+
+def _save_and_compare(
+    task: TaskFolder,
+    output_text: str,
+    comparator_kwargs: dict,
+) -> tuple[bool, str | None]:
+    """Save output to a temp dir and run the comparator against expected files."""
+    comparator = get_comparator(task.config.comparator, **comparator_kwargs)
+    cleaned = _clean_output(output_text)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_dir = Path(tmp)
+        # Write one output file per expected file (using same filenames)
+        for expected_file in task.expected_files:
+            (tmp_dir / expected_file.name).write_text(cleaned)
+
+        return comparator.compare(tmp_dir, task.path / "expected")
+
+
+def _aggregate_trials(model_name: str, trials: list[TrialResult]) -> ModelResult:
+    """Aggregate individual trials into a ModelResult."""
+    if not trials:
+        return ModelResult(
+            model=model_name, pass_rate=0.0, trials=[], avg_cost=0.0,
+            avg_latency=0.0, total_cost=0.0,
+        )
+
+    passed = sum(1 for t in trials if t.passed)
+    total_cost = sum(t.cost for t in trials)
+    total_latency = sum(t.latency_seconds for t in trials)
+    n = len(trials)
+
+    return ModelResult(
+        model=model_name,
+        pass_rate=passed / n,
+        trials=trials,
+        avg_cost=total_cost / n,
+        avg_latency=total_latency / n,
+        total_cost=total_cost,
+    )
+
+
+async def run_mode1(
+    task: TaskFolder,
+    models: list[ModelEntry],
+    engine: ExecutionEngine,
+    parallel: int,
+) -> RunSummary:
+    """Mode 1: Given skill, sweep executor models."""
+    if not task.skill:
+        raise ValueError("Mode 1 requires skill.md in the task folder")
+
+    writer = ResultWriter(task.path, "run")
+    user_content = format_input_files(task.input_files)
+    comparator_kwargs = {}
+    if task.config.comparator == "custom" and task.config.custom_script:
+        comparator_kwargs["custom_script"] = task.config.custom_script
+
+    # Build trial specs
+    specs: list[TrialSpec] = []
+    for model in models:
+        for trial_num in range(1, task.config.trials + 1):
+            specs.append(TrialSpec(
+                model=model,
+                messages=[
+                    {"role": "system", "content": task.skill},
+                    {"role": "user", "content": user_content},
+                ],
+                config=task.config,
+                trial_number=trial_num,
+            ))
+
+    # Execute with progress tracking
+    with create_progress() as progress:
+        ptask = progress.add_task("Running trials...", total=len(specs))
+
+        def on_progress(result: TrialResult) -> None:
+            progress.advance(ptask)
+
+        results = await engine.execute_batch(specs, on_progress=on_progress)
+
+    # Compare outputs and finalize results
+    model_trials: dict[str, list[TrialResult]] = {}
+    for trial in results:
+        if trial.error:
+            passed = False
+            diff = trial.error
+        else:
+            passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
+        trial.passed = passed
+        trial.diff = diff
+
+        model_trials.setdefault(trial.model, []).append(trial)
+
+        writer.write_trial_output(
+            model=trial.model,
+            trial_num=trial.trial_number,
+            output_text=trial.output_text,
+            diff=diff,
+            meta={
+                "input_tokens": trial.input_tokens,
+                "output_tokens": trial.output_tokens,
+                "cost": trial.cost,
+                "latency": trial.latency_seconds,
+                "passed": passed,
+                "finish_reason": trial.finish_reason,
+                "error": trial.error,
+            },
+        )
+
+    # Aggregate
+    model_results = [_aggregate_trials(name, trials) for name, trials in model_trials.items()]
+
+    # Recommendation
+    recommendation = _compute_recommendation(model_results, task.config.trials)
+
+    summary = RunSummary(
+        mode="run",
+        task_path=str(task.path),
+        timestamp=datetime.now().isoformat(),
+        model_results=model_results,
+        recommendation=recommendation,
+    )
+    writer.write_summary(summary)
+    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+
+    return summary
+
+
+def _compute_recommendation(results: list[ModelResult], num_trials: int) -> str | None:
+    """Find the cheapest model with 100% pass rate."""
+    perfect = [r for r in results if r.pass_rate == 1.0]
+    if not perfect:
+        best = max(results, key=lambda r: r.pass_rate) if results else None
+        if best:
+            return None
+        return None
+
+    cheapest = min(perfect, key=lambda r: r.avg_cost)
+    rec = f"{cheapest.model} (${cheapest.avg_cost:.6f}/run)"
+    if num_trials < 10:
+        rec += " [warning: trials < 10, consider increasing for confidence]"
+    return rec
+
+
+async def run_mode2(
+    task: TaskFolder,
+    creators: list[ModelEntry],
+    executors: list[ModelEntry],
+    engine: ExecutionEngine,
+) -> RunSummary:
+    """Mode 2: Creator x executor matrix."""
+    if not task.prompt:
+        raise ValueError("Mode 2 requires prompt.md in the task folder")
+
+    writer = ResultWriter(task.path, "matrix")
+    user_content = format_input_files(task.input_files)
+    input_desc = input_descriptions(task.input_files)
+    comparator_kwargs = {}
+    if task.config.comparator == "custom" and task.config.custom_script:
+        comparator_kwargs["custom_script"] = task.config.custom_script
+
+    # Phase 1: Skill Generation
+    console.print("[bold]Phase 1:[/bold] Generating skills...")
+    creator_specs: list[TrialSpec] = []
+    for creator in creators:
+        creator_specs.append(TrialSpec(
+            model=creator,
+            messages=[{
+                "role": "user",
+                "content": (
+                    "Write a task skill based on this description:\n\n"
+                    + task.prompt
+                    + "\n\nInput files the executor will receive:\n"
+                    + input_desc
+                ),
+            }],
+            config=task.config,
+            trial_number=1,
+        ))
+
+    with create_progress() as progress:
+        ptask = progress.add_task("Generating skills...", total=len(creator_specs))
+
+        def on_skill_progress(result: TrialResult) -> None:
+            progress.advance(ptask)
+
+        skill_results = await engine.execute_batch(creator_specs, on_progress=on_skill_progress)
+
+    generated_skills: dict[str, str] = {}
+    for i, creator in enumerate(creators):
+        result = skill_results[i]
+        if result.error:
+            console.print(f"[red]Skill generation failed for {creator.name}: {result.error}[/red]")
+            generated_skills[creator.name] = ""
+        else:
+            generated_skills[creator.name] = result.output_text
+            writer.write_generated_skill(creator.name, result.output_text)
+
+    # Phase 2: Execution
+    console.print("[bold]Phase 2:[/bold] Executing trials...")
+    exec_specs: list[TrialSpec] = []
+    spec_keys: list[tuple[str, str]] = []  # (creator, executor) per spec
+
+    for creator in creators:
+        skill_text = generated_skills[creator.name]
+        if not skill_text:
+            continue
+        for executor in executors:
+            for trial_num in range(1, task.config.trials + 1):
+                exec_specs.append(TrialSpec(
+                    model=executor,
+                    messages=[
+                        {"role": "system", "content": skill_text},
+                        {"role": "user", "content": user_content},
+                    ],
+                    config=task.config,
+                    trial_number=trial_num,
+                ))
+                spec_keys.append((creator.name, executor.name))
+
+    with create_progress() as progress:
+        ptask = progress.add_task("Running trials...", total=len(exec_specs))
+
+        def on_exec_progress(result: TrialResult) -> None:
+            progress.advance(ptask)
+
+        exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+
+    # Compare and aggregate
+    pair_trials: dict[tuple[str, str], list[TrialResult]] = {}
+    for i, trial in enumerate(exec_results):
+        cr_name, ex_name = spec_keys[i]
+        if trial.error:
+            passed = False
+            diff = trial.error
+        else:
+            passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
+        trial.passed = passed
+        trial.diff = diff
+
+        pair_trials.setdefault((cr_name, ex_name), []).append(trial)
+
+        writer.write_trial_output(
+            model=f"{cr_name}__{ex_name}",
+            trial_num=trial.trial_number,
+            output_text=trial.output_text,
+            diff=diff,
+            meta={
+                "creator": cr_name,
+                "executor": ex_name,
+                "input_tokens": trial.input_tokens,
+                "output_tokens": trial.output_tokens,
+                "cost": trial.cost,
+                "latency": trial.latency_seconds,
+                "passed": passed,
+            },
+        )
+
+    matrix_results: list[MatrixCell] = []
+    for (cr_name, ex_name), trials in pair_trials.items():
+        model_result = _aggregate_trials(ex_name, trials)
+        matrix_results.append(MatrixCell(
+            creator=cr_name,
+            executor=ex_name,
+            generated_skill=generated_skills[cr_name],
+            result=model_result,
+        ))
+
+    # Recommendation
+    perfect = [c for c in matrix_results if c.result.pass_rate == 1.0]
+    recommendation = None
+    if perfect:
+        cheapest = min(perfect, key=lambda c: c.result.avg_cost)
+        recommendation = (
+            f"{cheapest.creator} -> {cheapest.executor} "
+            f"(${cheapest.result.avg_cost:.6f}/run)"
+        )
+
+    summary = RunSummary(
+        mode="matrix",
+        task_path=str(task.path),
+        timestamp=datetime.now().isoformat(),
+        matrix_results=matrix_results,
+        recommendation=recommendation,
+    )
+    writer.write_summary(summary)
+    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+
+    return summary
+
+
+async def run_mode3(
+    task: TaskFolder,
+    meta_skill_names: list[str],
+    creators: list[ModelEntry],
+    executors: list[ModelEntry],
+    engine: ExecutionEngine,
+) -> RunSummary:
+    """Mode 3: Meta-skill x creator x executor chain."""
+    if not task.prompt:
+        raise ValueError("Mode 3 requires prompt.md in the task folder")
+
+    writer = ResultWriter(task.path, "chain")
+    user_content = format_input_files(task.input_files)
+    input_desc = input_descriptions(task.input_files)
+    comparator_kwargs = {}
+    if task.config.comparator == "custom" and task.config.custom_script:
+        comparator_kwargs["custom_script"] = task.config.custom_script
+
+    # Validate meta-skills
+    for ms_name in meta_skill_names:
+        if ms_name not in task.meta_skills:
+            available = ", ".join(sorted(task.meta_skills.keys())) if task.meta_skills else "none"
+            raise ValueError(
+                f"Meta-skill '{ms_name}' not found. Available: {available}"
+            )
+
+    # Phase 1: Skill Generation
+    console.print("[bold]Phase 1:[/bold] Generating skills with meta-skills...")
+    gen_specs: list[TrialSpec] = []
+    gen_keys: list[tuple[str, str]] = []  # (meta_skill_name, creator_name) per spec
+
+    for ms_name in meta_skill_names:
+        ms_content = task.meta_skills[ms_name]
+        for creator in creators:
+            gen_specs.append(TrialSpec(
+                model=creator,
+                messages=[
+                    {"role": "system", "content": ms_content},
+                    {
+                        "role": "user",
+                        "content": (
+                            "Write a task skill for this task:\n\n"
+                            + task.prompt
+                            + "\n\nInput files:\n"
+                            + input_desc
+                        ),
+                    },
+                ],
+                config=task.config,
+                trial_number=1,
+            ))
+            gen_keys.append((ms_name, creator.name))
+
+    with create_progress() as progress:
+        ptask = progress.add_task("Generating skills...", total=len(gen_specs))
+
+        def on_gen_progress(result: TrialResult) -> None:
+            progress.advance(ptask)
+
+        gen_results = await engine.execute_batch(gen_specs, on_progress=on_gen_progress)
+
+    generated_skills: dict[tuple[str, str], str] = {}
+    for i, (ms_name, cr_name) in enumerate(gen_keys):
+        result = gen_results[i]
+        if result.error:
+            console.print(
+                f"[red]Skill generation failed for {ms_name}/{cr_name}: {result.error}[/red]"
+            )
+            generated_skills[(ms_name, cr_name)] = ""
+        else:
+            generated_skills[(ms_name, cr_name)] = result.output_text
+            writer.write_generated_skill(cr_name, result.output_text, meta_skill=ms_name)
+
+    # Phase 2: Execution
+    console.print("[bold]Phase 2:[/bold] Executing trials...")
+    exec_specs: list[TrialSpec] = []
+    exec_keys: list[tuple[str, str, str]] = []  # (meta_skill, creator, executor)
+
+    for ms_name in meta_skill_names:
+        for creator in creators:
+            skill_text = generated_skills.get((ms_name, creator.name), "")
+            if not skill_text:
+                continue
+            for executor in executors:
+                for trial_num in range(1, task.config.trials + 1):
+                    exec_specs.append(TrialSpec(
+                        model=executor,
+                        messages=[
+                            {"role": "system", "content": skill_text},
+                            {"role": "user", "content": user_content},
+                        ],
+                        config=task.config,
+                        trial_number=trial_num,
+                    ))
+                    exec_keys.append((ms_name, creator.name, executor.name))
+
+    with create_progress() as progress:
+        ptask = progress.add_task("Running trials...", total=len(exec_specs))
+
+        def on_exec_progress(result: TrialResult) -> None:
+            progress.advance(ptask)
+
+        exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+
+    # Compare and aggregate
+    chain_trials: dict[tuple[str, str, str], list[TrialResult]] = {}
+    for i, trial in enumerate(exec_results):
+        ms_name, cr_name, ex_name = exec_keys[i]
+        if trial.error:
+            passed = False
+            diff = trial.error
+        else:
+            passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
+        trial.passed = passed
+        trial.diff = diff
+
+        chain_trials.setdefault((ms_name, cr_name, ex_name), []).append(trial)
+
+        writer.write_trial_output(
+            model=f"{ms_name}__{cr_name}__{ex_name}",
+            trial_num=trial.trial_number,
+            output_text=trial.output_text,
+            diff=diff,
+            meta={
+                "meta_skill": ms_name,
+                "creator": cr_name,
+                "executor": ex_name,
+                "input_tokens": trial.input_tokens,
+                "output_tokens": trial.output_tokens,
+                "cost": trial.cost,
+                "latency": trial.latency_seconds,
+                "passed": passed,
+            },
+        )
+
+    chain_results: list[ChainCell] = []
+    for (ms_name, cr_name, ex_name), trials in chain_trials.items():
+        model_result = _aggregate_trials(ex_name, trials)
+        chain_results.append(ChainCell(
+            meta_skill_name=ms_name,
+            creator=cr_name,
+            executor=ex_name,
+            generated_skill=generated_skills.get((ms_name, cr_name), ""),
+            result=model_result,
+        ))
+
+    # Recommendation
+    perfect = [c for c in chain_results if c.result.pass_rate == 1.0]
+    recommendation = None
+    if perfect:
+        cheapest = min(perfect, key=lambda c: c.result.avg_cost)
+        recommendation = (
+            f"{cheapest.meta_skill_name} / {cheapest.creator} -> {cheapest.executor} "
+            f"(${cheapest.result.avg_cost:.6f}/run)"
+        )
+
+    summary = RunSummary(
+        mode="chain",
+        task_path=str(task.path),
+        timestamp=datetime.now().isoformat(),
+        chain_results=chain_results,
+        recommendation=recommendation,
+    )
+    writer.write_summary(summary)
+    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+
+    return summary

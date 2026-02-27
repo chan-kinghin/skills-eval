@@ -1,0 +1,43 @@
+{
+  "vendor": "TechBridge Solutions Ltd.",
+  "invoice_number": "INV-2026-0847",
+  "date": "2026-02-15",
+  "due_date": "2026-03-17",
+  "client": "GreenLeaf Enterprises",
+  "contact": "Sarah Chen",
+  "line_items": [
+    {
+      "description": "Cloud Infrastructure Setup",
+      "quantity": 40,
+      "unit": "hours",
+      "rate": 150.00,
+      "amount": 6000.00
+    },
+    {
+      "description": "API Integration Development",
+      "quantity": 25,
+      "unit": "hours",
+      "rate": 175.00,
+      "amount": 4375.00
+    },
+    {
+      "description": "Security Audit & Compliance Review",
+      "quantity": 1,
+      "unit": "lump sum",
+      "rate": 2500.00,
+      "amount": 2500.00
+    },
+    {
+      "description": "Project Management",
+      "quantity": 15,
+      "unit": "hours",
+      "rate": 125.00,
+      "amount": 1875.00
+    }
+  ],
+  "subtotal": 14750.00,
+  "tax_rate": 8.5,
+  "tax_amount": 1253.75,
+  "total": 16003.75,
+  "currency": "USD"
+}
