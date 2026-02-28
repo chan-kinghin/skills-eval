@@ -27,8 +27,8 @@ All tests must pass before submitting a PR. The CI pipeline runs both lint and t
 
 ```
 src/skilleval/
-├── cli.py              # Click CLI commands (init, run, matrix, chain, catalog, report)
-├── config.py           # Task folder loading, model catalog, filtering
+├── cli.py              # Click CLI commands (init, run, matrix, chain, catalog, report, lint, compare, skill-test)
+├── config.py           # Task folder loading, model catalog, filtering, ad-hoc model builder
 ├── client.py           # Async OpenAI-compatible HTTP client with retry
 ├── engine.py           # Concurrency control (global + per-provider semaphores)
 ├── runner.py           # Mode 1/2/3 orchestrators
@@ -36,6 +36,10 @@ src/skilleval/
 ├── documents.py        # PDF/DOCX/XLSX text extraction
 ├── display.py          # Rich console output helpers
 ├── results.py          # Result file writer
+├── linter.py           # Claude Code skill structure validation
+├── skill_parser.py     # Skill prompt extraction and test case loading
+├── compare.py          # Run comparison / regression detection
+├── html_report.py      # Self-contained HTML report generation
 ├── default_models.yaml # Bundled model catalog
 └── comparators/
     ├── __init__.py     # Registry and factory (get_comparator)

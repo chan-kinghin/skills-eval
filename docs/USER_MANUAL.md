@@ -16,14 +16,19 @@
 6. [Mode 1: Skill Evaluation (`run`)](#6-mode-1-skill-evaluation)
 7. [Mode 2: Matrix Evaluation (`matrix`)](#7-mode-2-matrix-evaluation)
 8. [Mode 3: Chain Evaluation (`chain`)](#8-mode-3-chain-evaluation)
-9. [CLI Reference](#9-cli-reference)
-10. [Configuration (`config.yaml`)](#10-configuration)
-11. [Model Catalog](#11-model-catalog)
-12. [Supported Input Files](#12-supported-input-files)
-13. [Comparators](#13-comparators)
-14. [Results & Output](#14-results--output)
-15. [Sample Walkthrough](#15-sample-walkthrough)
-16. [Troubleshooting / FAQ](#16-troubleshooting--faq)
+9. [Ad-Hoc Endpoints](#9-ad-hoc-endpoints)
+10. [Skill Linting (`lint`)](#10-skill-linting)
+11. [Skill Testing (`skill-test`)](#11-skill-testing)
+12. [Run Comparison (`compare`)](#12-run-comparison)
+13. [HTML Reports](#13-html-reports)
+14. [CLI Reference](#14-cli-reference)
+15. [Configuration (`config.yaml`)](#15-configuration)
+16. [Model Catalog](#16-model-catalog)
+17. [Supported Input Files](#17-supported-input-files)
+18. [Comparators](#18-comparators)
+19. [Results & Output](#19-results--output)
+20. [Sample Walkthrough](#20-sample-walkthrough)
+21. [Troubleshooting / FAQ](#21-troubleshooting--faq)
 
 ---
 
@@ -178,7 +183,7 @@ A **trial** is a single API call to a model. By default, SkillEval runs 5 trials
 
 ### Comparator
 
-A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 6 comparators (see [Comparators](#13-comparators)).
+A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 6 comparators (see [Comparators](#18-comparators)).
 
 ### Modes
 
@@ -212,7 +217,7 @@ my-extraction-task/
 
 ### Preparing Input Files
 
-Place the files your model will process in the `input/` directory. SkillEval supports many formats (see [Supported Input Files](#12-supported-input-files)). All input files are concatenated and sent as part of the prompt.
+Place the files your model will process in the `input/` directory. SkillEval supports many formats (see [Supported Input Files](#17-supported-input-files)). All input files are concatenated and sent as part of the prompt.
 
 Input files are formatted for the LLM as:
 
@@ -397,7 +402,200 @@ SkillEval displays:
 
 ---
 
-## 9. CLI Reference
+## 9. Ad-Hoc Endpoints
+
+You can evaluate any OpenAI-compatible model without editing the catalog by passing `--endpoint`, `--api-key`, and `--model-name` to `run`, `matrix`, `chain`, or `skill-test`.
+
+### Example
+
+```bash
+# Test a local Ollama model
+skilleval run my-task \
+  --endpoint http://localhost:11434/v1 \
+  --model-name llama3 \
+  --api-key ""
+
+# Test an OpenAI model alongside catalog models
+skilleval run my-task \
+  --endpoint https://api.openai.com/v1 \
+  --api-key $OPENAI_API_KEY \
+  --model-name gpt-4o \
+  --models qwen-turbo,gpt-4o
+```
+
+### How It Works
+
+The ad-hoc model is appended to the catalog and treated like any other model. It is automatically included in the `filter_available` set (since it carries an embedded API key). To run it alongside catalog models, include its `--model-name` in `--models`.
+
+### Cost Tracking
+
+Ad-hoc models default to `$0` for input and output costs. Token usage is still tracked, but cost calculations will show `$0`. To get accurate cost tracking, add the model to a `models.yaml` with pricing.
+
+### Flags
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--endpoint` | Yes | OpenAI-compatible API base URL (must be `http://` or `https://`) |
+| `--model-name` | Yes (with `--endpoint`) | The model identifier sent in API requests |
+| `--api-key` | No | API key for the endpoint (use `""` for keyless endpoints like Ollama) |
+
+---
+
+## 10. Skill Linting
+
+**Command:** `skilleval lint <skill_path>`
+
+Validates the structure of a Claude Code skill directory. Useful for catching common issues before testing.
+
+### What It Checks
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| Frontmatter exists | Error | YAML frontmatter (`--- ... ---`) must be present at the top |
+| Required fields | Error | Frontmatter must include `name` and `description` |
+| Numbered phases | Error | At least one `## Phase N` or `### Step N` heading required |
+| Error handling section | Warning | Missing `## Error Handling` heading |
+| Rules section | Warning | Missing `## Rules` or `## Important Rules` heading |
+| Reference file links | Error | Markdown links to `references/` must point to existing files |
+| Python code blocks | Error | Python code blocks must have valid syntax |
+| Bash code blocks | Error | Bash code blocks must pass `bash -n` syntax check |
+
+### Quality Score
+
+The linter computes a quality score (0-100):
+- Starts at 100
+- Each error deducts 20 points
+- Each warning deducts 10 points
+- Each info-level issue deducts 2 points
+
+### Example
+
+```bash
+skilleval lint ~/.claude/skills/my-skill/
+```
+
+### Exit Code
+
+Exits with code `1` if any errors are found, `0` otherwise. Warnings do not cause a non-zero exit.
+
+---
+
+## 11. Skill Testing
+
+**Command:** `skilleval skill-test <skill_path> --test-cases <test_dir>`
+
+Tests a Claude Code skill by extracting its core prompt logic and running it through the evaluation engine against multiple test cases.
+
+### How It Works
+
+1. Parses `skill.md` from the skill directory:
+   - Strips YAML frontmatter
+   - Removes tool-use scaffolding (bash/shell code blocks, CLI instructions)
+   - Extracts the core prompt logic
+2. Loads test cases from the test directory
+3. Runs each test case through Mode 1 evaluation using the extracted prompt
+
+### Test Case Structure
+
+```
+test-cases/
+├── config.yaml           # Shared configuration (comparator, trials, etc.)
+├── case-1/
+│   ├── input/            # Input files for this test case
+│   └── expected/         # Expected output files
+├── case-2/
+│   ├── input/
+│   └── expected/
+```
+
+### Example
+
+```bash
+skilleval skill-test ~/.claude/skills/my-skill/ \
+  --test-cases ./test-cases/ \
+  --models qwen-turbo,glm-4.5-flash \
+  --trials 3
+```
+
+### Output
+
+Displays a per-case, per-model results table and an overall summary showing how many test cases each model passed.
+
+---
+
+## 12. Run Comparison
+
+**Command:** `skilleval compare <old_run> <new_run>`
+
+Compares results from two evaluation runs to detect improvements and regressions. Useful when iterating on a `skill.md` prompt.
+
+### How It Works
+
+1. Loads `results.json` from both run directories
+2. Matches models between runs
+3. Computes pass rate deltas
+4. Classifies each model as: improved, regressed, unchanged, new, or removed
+
+### Example
+
+```bash
+skilleval compare \
+  my-task/.skilleval/run-20260227-143052 \
+  my-task/.skilleval/run-20260228-091500
+```
+
+### Output
+
+Displays a comparison table with columns:
+
+| Column | Description |
+|--------|-------------|
+| Model | Model name |
+| Old Rate | Pass rate from the first run |
+| New Rate | Pass rate from the second run |
+| Delta | Change in pass rate (e.g., `+20%`, `-40%`) |
+| Status | `improved`, `regressed`, `unchanged`, `new`, or `removed` |
+
+---
+
+## 13. HTML Reports
+
+Generate self-contained HTML reports from evaluation results for sharing with stakeholders.
+
+### Usage
+
+```bash
+# Generate an HTML report
+skilleval report my-task/.skilleval/run-20260227-143052 --html report.html
+
+# Generate and open in browser
+skilleval report my-task/.skilleval/run-20260227-143052 --html report.html --open
+```
+
+### What's Included
+
+The HTML report is self-contained (inline CSS/JS, no external dependencies) and includes mode-specific visualizations:
+
+**Mode 1 (`run`):**
+- Pass rate bar chart per model (color-coded: green/yellow/red)
+- Cost comparison table (avg cost, avg latency, total cost)
+- Collapsible per-model trial details (with expand/collapse all)
+
+**Mode 2 (`matrix`):**
+- Creator x executor heatmap with color-coded cells
+- Best pair highlighted with accent outline
+
+**Mode 3 (`chain`):**
+- Pass rate bars grouped by meta-skill variant
+- Collapsible variant detail tables (creator, executor, pass rate, cost, latency)
+
+### Design
+
+The report uses a dark theme designed for readability. It is fully responsive and works on mobile.
+
+---
+
+## 14. CLI Reference
 
 ### `skilleval`
 
@@ -411,12 +609,15 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  catalog  Display model catalog with availability status.
-  chain    Mode 3: Meta-skill x creator x executor chain evaluation.
-  init     Create a new task folder with template files.
-  matrix   Mode 2: Creator x executor matrix evaluation.
-  report   Re-render results from a previous run.
-  run      Mode 1: Evaluate models with a given skill.
+  catalog     Display model catalog with availability status.
+  chain       Mode 3: Meta-skill x creator x executor chain evaluation.
+  compare     Compare results from two runs.
+  init        Create a new task folder with template files.
+  lint        Validate a Claude Code skill structure.
+  matrix      Mode 2: Creator x executor matrix evaluation.
+  report      Re-render results from a previous run.
+  run         Mode 1: Evaluate models with a given skill.
+  skill-test  Test a Claude Code skill against test cases.
 ```
 
 ### `skilleval init`
@@ -436,6 +637,9 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--trials` | No | From config | Override trial count |
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
+| `--api-key` | No | — | API key for ad-hoc endpoint |
+| `--model-name` | No | — | Model name for ad-hoc endpoint |
 
 ### `skilleval matrix`
 
@@ -447,6 +651,9 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--trials` | No | From config | Override trial count |
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
+| `--api-key` | No | — | API key for ad-hoc endpoint |
+| `--model-name` | No | — | Model name for ad-hoc endpoint |
 
 ### `skilleval chain`
 
@@ -460,6 +667,9 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
 | `--confirm` | No | `false` | Skip confirmation for large runs (>100 API calls) |
+| `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
+| `--api-key` | No | — | API key for ad-hoc endpoint |
+| `--model-name` | No | — | Model name for ad-hoc endpoint |
 
 ### `skilleval catalog`
 
@@ -469,15 +679,48 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 
 ### `skilleval report`
 
+| Argument/Option | Required | Default | Description |
+|-----------------|----------|---------|-------------|
+| `RESULTS_PATH` | Yes | — | Path to results directory or `results.json` file |
+| `--html` | No | — | Path to write HTML report |
+| `--open` | No | `false` | Open HTML report in browser after generation |
+
+Re-renders results from a previous run without making any API calls. Optionally generates a self-contained HTML report.
+
+### `skilleval lint`
+
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `RESULTS_PATH` | Yes | Path to results directory or `results.json` file |
+| `SKILL_PATH` | Yes | Path to Claude Code skill directory |
 
-Re-renders results from a previous run without making any API calls.
+Validates skill structure (frontmatter, phases, references, code blocks). Exits with code `1` if errors are found.
+
+### `skilleval compare`
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `OLD_RUN` | Yes | Path to the first (baseline) run results |
+| `NEW_RUN` | Yes | Path to the second (updated) run results |
+
+Shows a diff table of pass rate changes between two runs.
+
+### `skilleval skill-test`
+
+| Argument/Option | Required | Default | Description |
+|-----------------|----------|---------|-------------|
+| `SKILL_PATH` | Yes | — | Path to Claude Code skill directory |
+| `--test-cases` | Yes | — | Path to test case directory |
+| `--models` | No | All available | Comma-separated model names |
+| `--trials` | No | From config | Override trial count |
+| `--parallel` | No | `20` | Max concurrent API calls |
+| `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
+| `--api-key` | No | — | API key for ad-hoc endpoint |
+| `--model-name` | No | — | Model name for ad-hoc endpoint |
 
 ---
 
-## 10. Configuration
+## 15. Configuration
 
 Each task folder contains a `config.yaml` file that controls evaluation behavior.
 
@@ -525,11 +768,11 @@ output_format: json
 | `file_hash` | Byte-identical SHA-256 comparison |
 | `custom` | Run a user-provided script (requires `custom_script`) |
 
-See [Comparators](#13-comparators) for detailed descriptions.
+See [Comparators](#18-comparators) for detailed descriptions.
 
 ---
 
-## 11. Model Catalog
+## 16. Model Catalog
 
 ### Default Models
 
@@ -607,7 +850,7 @@ Only models whose `env_key` variable is set in the environment are considered "a
 
 ---
 
-## 12. Supported Input Files
+## 17. Supported Input Files
 
 SkillEval extracts text from input files and formats them for the LLM. The following file types are supported:
 
@@ -657,7 +900,7 @@ RuntimeError: PDF extraction requires pdfplumber. Install with:
 
 ---
 
-## 13. Comparators
+## 18. Comparators
 
 Comparators determine how SkillEval checks whether a model's output matches the expected result. All comparators return a (passed, diff) tuple where `diff` is `None` on success or a descriptive error string on failure.
 
@@ -804,7 +1047,7 @@ sys.exit(0)
 
 ---
 
-## 14. Results & Output
+## 19. Results & Output
 
 ### Output Directory
 
@@ -932,7 +1175,7 @@ skilleval report my-task/.skilleval/run-20260227-143052/results.json
 
 ---
 
-## 15. Sample Walkthrough
+## 20. Sample Walkthrough
 
 This walkthrough uses the bundled `invoice-extraction` task to demonstrate an end-to-end Mode 1 evaluation.
 
@@ -1028,7 +1271,7 @@ Then re-run the evaluation.
 
 ---
 
-## 16. Troubleshooting / FAQ
+## 21. Troubleshooting / FAQ
 
 ### "No models available"
 

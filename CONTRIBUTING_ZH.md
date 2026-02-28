@@ -27,8 +27,8 @@ ruff check src/ tests/    # 代码风格检查
 
 ```
 src/skilleval/
-├── cli.py              # Click CLI 命令（init、run、matrix、chain、catalog、report）
-├── config.py           # 任务文件夹加载、模型目录、过滤
+├── cli.py              # Click CLI 命令（init、run、matrix、chain、catalog、report、lint、compare、skill-test）
+├── config.py           # 任务文件夹加载、模型目录、过滤、临时模型构建
 ├── client.py           # 异步 OpenAI 兼容 HTTP 客户端，支持重试
 ├── engine.py           # 并发控制（全局 + 按供应商信号量）
 ├── runner.py           # 模式 1/2/3 编排器
@@ -36,6 +36,10 @@ src/skilleval/
 ├── documents.py        # PDF/DOCX/XLSX 文本提取
 ├── display.py          # Rich 控制台输出辅助工具
 ├── results.py          # 结果文件写入器
+├── linter.py           # Claude Code 技能结构验证
+├── skill_parser.py     # 技能提示词提取和测试用例加载
+├── compare.py          # 运行比较 / 退化检测
+├── html_report.py      # 独立 HTML 报告生成
 ├── default_models.yaml # 内置模型目录
 └── comparators/
     ├── __init__.py     # 注册表和工厂函数（get_comparator）

@@ -39,6 +39,14 @@ skilleval run my-task/
 - **模式 2（`matrix`）** — 一个模型编写提示词，另一个模型执行。测试所有创建者 x 执行者的组合。
 - **模式 3（`chain`）** — 元技能（meta-skill）指导提示词的创建，然后由另一个模型执行。完整流水线评估。
 
+## 附加功能
+
+- **临时端点** — 无需修改模型目录即可使用任何 OpenAI 兼容 API：`--endpoint`、`--api-key`、`--model-name`。
+- **技能检查（`lint`）** — 验证 Claude Code 技能结构（frontmatter、阶段、引用、代码块）。
+- **技能测试（`skill-test`）** — 将技能的核心提示逻辑与预期输出进行测试。
+- **运行比较（`compare`）** — 对比两次运行结果以检测改进或退化。
+- **HTML 报告（`report --html`）** — 生成独立的 HTML 报告以便分享。
+
 ## 文档
 
 详细的安装说明、配置选项、比较器参考和操作指南，请参阅[用户手册](docs/USER_MANUAL_ZH.md)（[English](docs/USER_MANUAL.md)）。

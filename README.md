@@ -39,6 +39,14 @@ skilleval run my-task/
 - **Mode 2 (`matrix`)** — One model writes the prompt, another executes it. Tests all creator x executor combinations.
 - **Mode 3 (`chain`)** — A meta-skill guides prompt creation, then another model executes it. Full pipeline evaluation.
 
+## Additional Features
+
+- **Ad-hoc endpoints** — Use any OpenAI-compatible API without editing the catalog: `--endpoint`, `--api-key`, `--model-name`.
+- **Skill linting (`lint`)** — Validate Claude Code skill structure (frontmatter, phases, references, code blocks).
+- **Skill testing (`skill-test`)** — Test a skill's core prompt logic against expected outputs.
+- **Run comparison (`compare`)** — Diff two runs to detect improvements or regressions.
+- **HTML reports (`report --html`)** — Generate self-contained HTML reports for sharing.
+
 ## Documentation
 
 See the [User Manual](docs/USER_MANUAL.md) ([中文](docs/USER_MANUAL_ZH.md)) for detailed setup instructions, configuration options, comparator reference, and walkthroughs.
