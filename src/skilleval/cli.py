@@ -4,20 +4,34 @@ from __future__ import annotations
 
 import asyncio
 import json
+import webbrowser
 from pathlib import Path
 
 import click
 
-from skilleval.config import filter_available, filter_by_names, load_catalog, load_task
+from skilleval.config import (
+    build_adhoc_model,
+    filter_available,
+    filter_by_names,
+    load_catalog,
+    load_task,
+)
 from skilleval.display import (
     console,
     display_catalog,
+    display_comparison,
     display_chain_results,
+    display_lint_report,
     display_matrix_results,
     display_pre_run_estimate,
     display_run_results,
+    display_skill_test_results,
 )
 from skilleval.models import RunSummary
+from skilleval.linter import lint_skill
+from skilleval.compare import compare_runs
+from skilleval.html_report import generate_html_report
+from skilleval.skill_parser import load_test_cases, parse_skill
 
 
 @click.group()
@@ -98,12 +112,18 @@ def init(name: str) -> None:
 @click.option("--trials", default=None, type=int, help="Override trial count from config")
 @click.option("--parallel", default=20, type=int, help="Max concurrent API calls")
 @click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
+@click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
+@click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
+@click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
 def run(
     task_path: str,
     models: str | None,
     trials: int | None,
     parallel: int,
     catalog_path: str | None,
+    endpoint: str | None,
+    api_key: str | None,
+    model_name: str | None,
 ) -> None:
     """Mode 1: Evaluate models with a given skill."""
     try:
@@ -119,6 +139,13 @@ def run(
             selected = filter_by_names(catalog, models.split(","))
         else:
             selected = filter_available(catalog)
+
+        # Optional ad-hoc model support
+        if endpoint:
+            if not model_name:
+                raise click.ClickException("When using --endpoint, you must provide --model-name.")
+            adhoc = build_adhoc_model(endpoint, api_key or "", model_name)
+            selected = [adhoc] + selected
 
         if not selected:
             raise click.ClickException(
@@ -152,6 +179,9 @@ async def _run_mode1(task, selected, parallel):
 @click.option("--trials", default=None, type=int, help="Override trial count from config")
 @click.option("--parallel", default=20, type=int, help="Max concurrent API calls")
 @click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
+@click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
+@click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
+@click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
 def matrix(
     task_path: str,
     creators: str,
@@ -159,6 +189,9 @@ def matrix(
     trials: int | None,
     parallel: int,
     catalog_path: str | None,
+    endpoint: str | None,
+    api_key: str | None,
+    model_name: str | None,
 ) -> None:
     """Mode 2: Creator x executor matrix evaluation."""
     try:
@@ -172,6 +205,14 @@ def matrix(
         catalog = load_catalog(catalog_path)
         creator_models = filter_by_names(catalog, creators.split(","))
         executor_models = filter_by_names(catalog, executors.split(","))
+
+        # Optional ad-hoc model prepended to both creator and executor lists
+        if endpoint:
+            if not model_name:
+                raise click.ClickException("When using --endpoint, you must provide --model-name.")
+            adhoc = build_adhoc_model(endpoint, api_key or "", model_name)
+            creator_models = [adhoc] + creator_models
+            executor_models = [adhoc] + executor_models
 
         num_calls = len(creator_models) + len(creator_models) * len(executor_models) * task.config.trials
         console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
@@ -208,6 +249,9 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
 @click.option("--parallel", default=20, type=int, help="Max concurrent API calls")
 @click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
 @click.option("--confirm", is_flag=True, help="Skip confirmation for large runs")
+@click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
+@click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
+@click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
 def chain(
     task_path: str,
     meta_skills: str,
@@ -217,6 +261,9 @@ def chain(
     parallel: int,
     catalog_path: str | None,
     confirm: bool,
+    endpoint: str | None,
+    api_key: str | None,
+    model_name: str | None,
 ) -> None:
     """Mode 3: Meta-skill x creator x executor chain evaluation."""
     try:
@@ -231,6 +278,14 @@ def chain(
         catalog = load_catalog(catalog_path)
         creator_models = filter_by_names(catalog, creators.split(","))
         executor_models = filter_by_names(catalog, executors.split(","))
+
+        # Optional ad-hoc model prepended to both creator and executor lists
+        if endpoint:
+            if not model_name:
+                raise click.ClickException("When using --endpoint, you must provide --model-name.")
+            adhoc = build_adhoc_model(endpoint, api_key or "", model_name)
+            creator_models = [adhoc] + creator_models
+            executor_models = [adhoc] + executor_models
 
         # Validate meta-skills exist
         for ms_name in meta_skill_names:
@@ -294,7 +349,9 @@ def catalog_cmd(catalog_path: str | None) -> None:
 
 @cli.command()
 @click.argument("results_path")
-def report(results_path: str) -> None:
+@click.option("--html", "html_path", default=None, help="Generate HTML report at path")
+@click.option("--open", "open_browser", is_flag=True, help="Open HTML in browser")
+def report(results_path: str, html_path: str | None, open_browser: bool) -> None:
     """Re-render results from a previous run."""
     try:
         path = Path(results_path)
@@ -305,6 +362,18 @@ def report(results_path: str) -> None:
 
         data = json.loads(results_file.read_text())
         summary = RunSummary(**data)
+
+        # Optional HTML report path
+        if html_path:
+            out = generate_html_report(summary, Path(html_path))
+            click.echo(f"HTML report written to: {out}")
+            if open_browser:
+                try:
+                    webbrowser.open(out.as_uri())
+                except Exception:
+                    # Fall back to path string if as_uri fails
+                    webbrowser.open(str(out))
+            return
 
         if summary.mode == "run":
             display_run_results(summary.model_results, summary.recommendation)
@@ -319,4 +388,86 @@ def report(results_path: str) -> None:
             console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
 
     except (ValueError, json.JSONDecodeError) as e:
+        raise click.ClickException(str(e))
+
+
+# ── Additional Commands ───────────────────────────────────────────────────
+
+
+@cli.command()
+@click.argument("skill_path")
+def lint(skill_path: str) -> None:
+    """Validate a Claude Code skill structure."""
+    try:
+        report = lint_skill(Path(skill_path))
+        display_lint_report(report)
+        if any((iss.severity or "").lower() == "error" for iss in report.issues):
+            raise SystemExit(1)
+    except (ValueError, FileNotFoundError) as e:
+        raise click.ClickException(str(e))
+
+
+@cli.command()
+@click.argument("old_run")
+@click.argument("new_run")
+def compare(old_run: str, new_run: str) -> None:
+    """Compare results from two runs."""
+    try:
+        report = compare_runs(Path(old_run), Path(new_run))
+        display_comparison(report)
+    except (ValueError, FileNotFoundError) as e:
+        raise click.ClickException(str(e))
+
+
+@cli.command("skill-test")
+@click.argument("skill_path")
+@click.option("--test-cases", required=True, help="Path to test case directory")
+@click.option("--models", default=None, help="Comma-separated model names")
+@click.option("--trials", default=None, type=int, help="Override trial count")
+@click.option("--parallel", default=20, type=int, help="Max concurrent API calls")
+@click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
+def skill_test(
+    skill_path: str,
+    test_cases: str,
+    models: str | None,
+    trials: int | None,
+    parallel: int,
+    catalog_path: str | None,
+) -> None:
+    """Test a Claude Code skill against test cases."""
+    try:
+        skill_prompt = parse_skill(Path(skill_path))
+        cases = load_test_cases(Path(test_cases))
+        if not cases:
+            raise click.ClickException("No valid test cases found in the specified directory")
+
+        # Models selection pattern same as run
+        catalog = load_catalog(catalog_path)
+        if models:
+            selected = filter_by_names(catalog, models.split(","))
+        else:
+            selected = filter_available(catalog)
+
+        if not selected:
+            raise click.ClickException(
+                "No models available. Set API key env vars or use --models to specify."
+            )
+
+        console.print("[bold]Skill Test[/bold]")
+        console.print(f"Skill: {skill_prompt.name or skill_prompt.source_path}")
+        console.print(f"Models: {', '.join(m.name for m in selected)}")
+
+        # Execute Mode 1 for each case using the parsed skill core prompt
+        aggregated: list[tuple[str, list]] = []
+        for case in cases:
+            if trials is not None:
+                case.config.trials = trials
+            case.skill = skill_prompt.core_prompt
+            summary = asyncio.run(_run_mode1(case, selected, parallel))
+            case_name = Path(case.path).name
+            aggregated.append((case_name, summary.model_results))
+
+        display_skill_test_results(skill_prompt.name or "(unnamed skill)", aggregated)
+
+    except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))

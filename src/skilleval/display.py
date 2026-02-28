@@ -8,6 +8,11 @@ from rich.table import Table
 from rich.text import Text
 
 from skilleval.models import ChainCell, MatrixCell, ModelEntry, ModelResult
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # Avoid runtime import and keep ruff happy
+    from skilleval.compare import ComparisonReport
+    from skilleval.linter import LintReport
 
 console = Console()
 
@@ -198,3 +203,112 @@ def create_progress() -> Progress:
         TextColumn("[dim]{task.completed}/{task.total}[/dim]"),
         console=console,
     )
+
+
+def display_lint_report(report: "LintReport") -> None:
+    """Render linter results as a table with severity coloring."""
+    if not report.issues:
+        console.print("[bold green]No issues found![/bold green]")
+        console.print(f"Quality Score: [bold]{report.quality_score}[/bold]")
+        return
+
+    table = Table(title="Skill Lint Report", show_lines=True)
+    table.add_column("Severity", style="bold")
+    table.add_column("Line", justify="right")
+    table.add_column("Message")
+
+    for issue in report.issues:
+        sev = (issue.severity or "").lower()
+        style = "red" if sev == "error" else "yellow" if sev == "warning" else "blue"
+        line = str(issue.line) if issue.line is not None else "-"
+        table.add_row(Text(sev, style=style), line, issue.message)
+
+    console.print(table)
+    console.print(f"Quality Score: [bold]{report.quality_score}[/bold]")
+
+
+def display_comparison(report: "ComparisonReport") -> None:
+    """Render comparison between two runs (old vs new)."""
+    table = Table(title="Run Comparison", show_lines=True)
+    table.add_column("Model", style="bold")
+    table.add_column("Old Rate", justify="right")
+    table.add_column("New Rate", justify="right")
+    table.add_column("Delta", justify="right")
+    table.add_column("Status", justify="center")
+
+    # Sort by delta descending, then model name
+    entries = sorted(
+        report.entries,
+        key=lambda e: (e.new_pass_rate - e.old_pass_rate, e.model),
+        reverse=True,
+    )
+
+    for e in entries:
+        delta = e.new_pass_rate - e.old_pass_rate
+        delta_txt = f"{delta * 100:+.0f}%"
+        status_style = {
+            "improved": "green",
+            "regressed": "red",
+            "unchanged": "dim",
+            "new": "cyan",
+            "removed": "magenta",
+        }.get(e.status, "")
+
+        table.add_row(
+            e.model,
+            f"{e.old_pass_rate * 100:.0f}%",
+            f"{e.new_pass_rate * 100:.0f}%",
+            Text(delta_txt, style=status_style if e.status in {"improved", "regressed"} else ""),
+            Text(e.status, style=status_style),
+        )
+
+    console.print(table)
+    console.print(f"Summary: {report.summary}")
+
+
+def display_skill_test_results(
+    skill_name: str, results: list[tuple[str, list[ModelResult]]]
+) -> None:
+    """Display results of testing a skill against multiple test cases.
+
+    Args:
+        skill_name: Name of the skill under test.
+        results: List of tuples (case_name, model_results) where model_results
+                 is the standard Mode 1 per-model results list.
+    """
+    table = Table(title=f"Skill Test — {skill_name}", show_lines=True)
+    table.add_column("Test Case", style="bold")
+    table.add_column("Model")
+    table.add_column("Pass Rate", justify="right")
+    table.add_column("Avg Cost", justify="right")
+
+    # Track per-model success counts across cases for overall summary
+    per_model_totals: dict[str, tuple[int, int]] = {}  # model -> (passing_cases, total_cases)
+
+    for case_name, model_results in results:
+        # Sort as in other displays
+        for r in sorted(model_results, key=lambda x: (-x.pass_rate, x.avg_cost, x.model)):
+            rate_pct = f"{r.pass_rate * 100:.0f}%"
+            if r.pass_rate == 1.0:
+                rate_style = "green"
+            elif r.pass_rate >= 0.8:
+                rate_style = "yellow"
+            else:
+                rate_style = "red"
+
+            table.add_row(case_name, r.model, Text(rate_pct, style=rate_style), f"${r.avg_cost:.6f}")
+
+            # Update summary counters per model
+            ok, total = per_model_totals.get(r.model, (0, 0))
+            per_model_totals[r.model] = (ok + (1 if r.pass_rate == 1.0 else 0), total + 1)
+
+    console.print(table)
+
+    if per_model_totals:
+        console.print("\n[bold]Overall Summary per Model:[/bold]")
+        sum_table = Table(show_lines=True)
+        sum_table.add_column("Model", style="bold")
+        sum_table.add_column("Cases Passing", justify="right")
+        for model, (ok, total) in sorted(per_model_totals.items()):
+            sum_table.add_row(model, f"{ok}/{total}")
+        console.print(sum_table)
