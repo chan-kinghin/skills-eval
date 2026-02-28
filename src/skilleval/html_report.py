@@ -12,7 +12,7 @@ from html import escape
 from pathlib import Path
 from typing import Iterable
 
-from skilleval.models import ChainCell, MatrixCell, ModelResult, RunSummary, TrialResult
+from skilleval.models import ChainCell, MatrixCell, ModelResult, RunSummary
 
 
 def generate_html_report(summary: RunSummary, output_path: Path) -> Path:

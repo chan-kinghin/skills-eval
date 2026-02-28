@@ -142,10 +142,14 @@ def lint_skill(skill_dir: Path) -> LintReport:
 
 
 def _find_skill_file(skill_dir: Path) -> Path | None:
-    candidates = [skill_dir / "skill.md", skill_dir / "SKILL.md"]
-    for p in candidates:
-        if p.exists() and p.is_file():
-            return p
+    # Use directory listing for case-sensitive matching (macOS FS is case-insensitive)
+    try:
+        entries = {e.name: e for e in skill_dir.iterdir() if e.is_file()}
+    except OSError:
+        return None
+    for name in ("skill.md", "SKILL.md"):
+        if name in entries:
+            return entries[name]
     return None
 
 
