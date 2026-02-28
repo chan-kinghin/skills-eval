@@ -18,6 +18,38 @@ class ModelEntry(BaseModel):
     output_cost_per_m: float
     env_key: str
     context_window: int = 128_000
+    # For ad-hoc models where the API key is provided directly
+    api_key: str | None = None
+
+    @classmethod
+    def adhoc(
+        cls,
+        *,
+        endpoint: str,
+        api_key: str | None,
+        model_name: str,
+        input_cost: float = 0.0,
+        output_cost: float = 0.0,
+        context_window: int = 128_000,
+    ) -> "ModelEntry":
+        """Create an ad-hoc model entry for arbitrary OpenAI-compatible endpoints.
+
+        Defaults:
+        - provider: "adhoc"
+        - env_key: "_ADHOC_" (sentinel; key is stored in the entry)
+        - costs default to $0
+        - context window defaults to 128k
+        """
+        return cls(
+            name=model_name,
+            provider="adhoc",
+            endpoint=endpoint,
+            input_cost_per_m=input_cost,
+            output_cost_per_m=output_cost,
+            env_key="_ADHOC_",
+            context_window=context_window,
+            api_key=api_key,
+        )
 
 
 class TaskConfig(BaseModel):
