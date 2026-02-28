@@ -125,7 +125,7 @@ def run(
                 "No models available. Set API key env vars or use --models to specify."
             )
 
-        console.print(f"[bold]Mode 1: Skill Evaluation[/bold]")
+        console.print("[bold]Mode 1: Skill Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Models: {', '.join(m.name for m in selected)}")
         console.print(f"Trials: {task.config.trials}")
@@ -174,7 +174,7 @@ def matrix(
         executor_models = filter_by_names(catalog, executors.split(","))
 
         num_calls = len(creator_models) + len(creator_models) * len(executor_models) * task.config.trials
-        console.print(f"[bold]Mode 2: Matrix Evaluation[/bold]")
+        console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
         console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
@@ -245,7 +245,7 @@ def chain(
         exec_calls = len(meta_skill_names) * len(creator_models) * len(executor_models) * task.config.trials
         total_calls = gen_calls + exec_calls
 
-        console.print(f"[bold]Mode 3: Chain Evaluation[/bold]")
+        console.print("[bold]Mode 3: Chain Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
         console.print(f"Creators: {', '.join(m.name for m in creator_models)}")

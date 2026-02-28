@@ -61,7 +61,7 @@ class ResultWriter:
 
         summary_path = self.run_dir / "summary.txt"
         lines = [
-            f"SkillEval Run Summary",
+            "SkillEval Run Summary",
             f"Mode: {summary.mode}",
             f"Task: {summary.task_path}",
             f"Timestamp: {summary.timestamp}",
