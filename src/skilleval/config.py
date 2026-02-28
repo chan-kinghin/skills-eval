@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -108,8 +109,21 @@ def _resolve_catalog_path(catalog_path: str | Path | None) -> Path:
 
 
 def filter_available(models: list[ModelEntry]) -> list[ModelEntry]:
-    """Return only models whose API key env var is set."""
-    return [m for m in models if os.environ.get(m.env_key)]
+    """Return only models available for use.
+
+    A model is considered available if either:
+    - its environment variable specified by `env_key` is set, or
+    - it is an ad-hoc model instance carrying a non-empty `api_key`.
+    """
+    available: list[ModelEntry] = []
+    for m in models:
+        if os.environ.get(m.env_key):
+            available.append(m)
+            continue
+        # Allow ad-hoc models that embed the API key directly
+        if (m.api_key or "").strip():
+            available.append(m)
+    return available
 
 
 def filter_by_names(models: list[ModelEntry], names: list[str]) -> list[ModelEntry]:
@@ -120,3 +134,35 @@ def filter_by_names(models: list[ModelEntry], names: list[str]) -> list[ModelEnt
     if missing:
         raise ValueError(f"Models not found in catalog: {', '.join(sorted(missing))}")
     return found
+
+
+def build_adhoc_model(
+    endpoint: str,
+    api_key: str,
+    model_name: str,
+    input_cost: float = 0.0,
+    output_cost: float = 0.0,
+) -> ModelEntry:
+    """Construct and validate an ad-hoc ModelEntry.
+
+    Validation:
+    - `endpoint` must be a valid http(s) URL
+    - `model_name` must be non-empty
+    - costs default to $0 when not provided
+    """
+    # Validate endpoint URL
+    parsed = urlparse(endpoint or "")
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Invalid endpoint URL; must be http(s)://host[:port]/...")
+
+    # Validate model name
+    if not (model_name or "").strip():
+        raise ValueError("Model name must be provided and non-empty")
+
+    return ModelEntry.adhoc(
+        endpoint=endpoint,
+        api_key=api_key,
+        model_name=model_name,
+        input_cost=input_cost,
+        output_cost=output_cost,
+    )
