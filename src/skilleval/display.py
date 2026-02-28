@@ -7,10 +7,11 @@ from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn
 from rich.table import Table
 from rich.text import Text
 
-from skilleval.models import ChainCell, MatrixCell, ModelEntry, ModelResult
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:  # Avoid runtime import and keep ruff happy
+from skilleval.models import ChainCell, MatrixCell, ModelEntry, ModelResult
+
+if TYPE_CHECKING:
     from skilleval.compare import ComparisonReport
     from skilleval.linter import LintReport
 
@@ -218,7 +219,7 @@ def display_lint_report(report: "LintReport") -> None:
     table.add_column("Message")
 
     for issue in report.issues:
-        sev = (issue.severity or "").lower()
+        sev = issue.severity.lower()
         style = "red" if sev == "error" else "yellow" if sev == "warning" else "blue"
         line = str(issue.line) if issue.line is not None else "-"
         table.add_row(Text(sev, style=style), line, issue.message)

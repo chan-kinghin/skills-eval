@@ -282,11 +282,7 @@ def _render_matrix_mode(cells: list[MatrixCell]) -> str:
     executors = sorted({c.executor for c in cells})
     lookup: dict[tuple[str, str], MatrixCell] = {(c.creator, c.executor): c for c in cells}
 
-    # Determine best pair: highest pass rate, tie-breaker lowest avg cost per run
-    def sort_key(c: MatrixCell) -> tuple[float, float, str, str]:
-        return (c.result.pass_rate, -1.0 * (1.0 / (c.result.avg_cost + 1e-12)), c.creator, c.executor)
-
-    best = max(cells, key=sort_key)
+    best = max(cells, key=lambda c: (c.result.pass_rate, -c.result.avg_cost))
 
     parts: list[str] = ["<section class=heatmap>", "<h2>Creator × Executor Heatmap</h2>"]
     parts.append(

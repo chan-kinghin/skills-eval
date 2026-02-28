@@ -11,14 +11,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import re
-from typing import Iterable
 
 import yaml
 
 # We intentionally import linter internals as per task instructions
 from skilleval.linter import (
+    _Heading,
     _collect_headings,
-    _collect_code_blocks,  # noqa: F401  (kept for potential future use)
     _extract_frontmatter,
     _find_skill_file,
 )
@@ -124,7 +123,7 @@ def load_test_cases(test_dir: Path) -> list[TaskFolder]:
             path=sub.resolve(),
             input_files=input_files,
             expected_files=expected_files,
-            config=shared_config,
+            config=shared_config.model_copy(),
         )
         cases.append(case)
 
@@ -211,7 +210,7 @@ def _is_scaffolding_line(line: str) -> bool:
     return False
 
 
-def _extract_phase_names(headings: Iterable) -> list[str]:
+def _extract_phase_names(headings: list[_Heading]) -> list[str]:
     """Extract phase names from headings like '## Phase 1 — Setup'."""
 
     phases: list[str] = []
@@ -220,10 +219,9 @@ def _extract_phase_names(headings: Iterable) -> list[str]:
     re_simple = re.compile(r"^phase\s+\d+\b(.*)$", re.IGNORECASE)
 
     for h in headings:
-        # Only consider level 2/3 headings to align with linter's expectations
-        if getattr(h, "level", 0) not in (2, 3):
+        if h.level not in (2, 3):
             continue
-        title = str(getattr(h, "text", "")).strip()
+        title = h.text.strip()
         m = re_full.match(title)
         if m:
             name = m.group(1).strip()

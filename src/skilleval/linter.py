@@ -175,7 +175,7 @@ def _extract_frontmatter(text: str) -> tuple[dict | None, int, str, int]:
     yaml_text = "\n".join(lines[1:end_idx])
     try:
         data = yaml.safe_load(yaml_text)
-    except Exception:
+    except yaml.YAMLError:
         data = None
 
     body_lines = lines[end_idx + 1 :]
@@ -271,34 +271,6 @@ def _has_rules_section(headings: Iterable[_Heading]) -> bool:
         if h.level in (2, 3) and rules_re.search(h.text):
             return True
     return False
-
-
-def _check_references(skill_dir: Path, body: str, base_line: int = 1) -> list[LintIssue]:
-    issues: list[LintIssue] = []
-    # Match markdown links: [text](references/filename.ext)
-    # Also allow ./references/...
-    pattern = re.compile(r"\[[^\]]*\]\((?:\./)?references/[^)]+\)")
-    # For line numbers, scan line by line
-    for idx, raw_line in enumerate(body.splitlines(), start=base_line):
-        for m in pattern.finditer(raw_line):
-            link = m.group(0)
-            # Extract path between parentheses
-            p_m = re.search(r"\(([^)]+)\)", link)
-            if not p_m:
-                continue
-            rel_path = p_m.group(1)
-            # Strip optional quotes
-            rel_path = rel_path.strip('"\'')
-            target = (skill_dir / rel_path).resolve()
-            # Ensure path is within skill_dir to avoid traversal
-            try:
-                target.relative_to(skill_dir.resolve())
-            except Exception:
-                issues.append(LintIssue("warning", f"Reference escapes skill directory: {rel_path}", line=idx))
-                continue
-            if not target.exists():
-                issues.append(LintIssue("error", f"Missing reference file: {rel_path}", line=idx))
-    return issues
 
 
 @dataclass

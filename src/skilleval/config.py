@@ -65,15 +65,15 @@ def _load_meta_skills(task_path: Path) -> dict[str, str]:
 
 def load_catalog(catalog_path: str | Path | None = None) -> list[ModelEntry]:
     """Load model catalog with fallback chain."""
-    path = _resolve_catalog_path(catalog_path)
-    raw = yaml.safe_load(path.read_text())
+    text = _load_catalog_text(catalog_path)
+    raw = yaml.safe_load(text)
     if not isinstance(raw, list):
         raise ValueError(f"Model catalog must be a YAML list, got {type(raw).__name__}")
     return [ModelEntry(**entry) for entry in raw]
 
 
-def _resolve_catalog_path(catalog_path: str | Path | None) -> Path:
-    """Resolve model catalog path with fallback chain.
+def _load_catalog_text(catalog_path: str | Path | None) -> str:
+    """Load model catalog content with fallback chain.
 
     Resolution order:
     1. Explicit path from --catalog flag
@@ -93,15 +93,17 @@ def _resolve_catalog_path(catalog_path: str | Path | None) -> Path:
 
     for path in candidates:
         if path.exists():
-            return path
+            return path.read_text()
 
-    # Fall back to bundled default
+    # Fall back to bundled default — read via Traversable to avoid
+    # context-manager lifecycle issues with importlib.resources.as_file.
     import importlib.resources
 
     ref = importlib.resources.files("skilleval") / "default_models.yaml"
-    with importlib.resources.as_file(ref) as p:
-        if p.exists():
-            return p
+    try:
+        return ref.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        pass
 
     raise FileNotFoundError(
         "No model catalog found. Create a models.yaml or use --catalog to specify one."
@@ -121,7 +123,7 @@ def filter_available(models: list[ModelEntry]) -> list[ModelEntry]:
             available.append(m)
             continue
         # Allow ad-hoc models that embed the API key directly
-        if (m.api_key or "").strip():
+        if m.api_key and m.api_key.strip():
             available.append(m)
     return available
 
