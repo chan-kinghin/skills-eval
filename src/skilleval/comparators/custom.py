@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from pathlib import Path
 
 from skilleval.comparators.base import get_file_pairs
+
+logger = logging.getLogger(__name__)
 
 
 class CustomComparator:
@@ -16,11 +19,32 @@ class CustomComparator:
     Stdout is captured as diff text on failure.
     """
 
-    def __init__(self, *, custom_script: str) -> None:
+    def __init__(self, *, custom_script: str, task_dir: Path | None = None) -> None:
         self.script = custom_script
+        self.task_dir = task_dir
 
     def compare(self, output_dir: Path, expected_dir: Path) -> tuple[bool, str | None]:
         script_path = Path(self.script)
+
+        # Resolve relative paths against task_dir (if provided) or cwd
+        if not script_path.is_absolute():
+            base = self.task_dir if self.task_dir is not None else Path.cwd()
+            script_path = (base / script_path).resolve()
+        else:
+            script_path = script_path.resolve()
+
+        # Warn if the resolved path escapes via '..' traversal
+        sandbox = (self.task_dir if self.task_dir is not None else Path.cwd()).resolve()
+        try:
+            script_path.relative_to(sandbox)
+        except ValueError:
+            logger.warning(
+                "Custom script path '%s' is outside the sandbox directory '%s'. "
+                "Proceeding anyway since the user owns this system.",
+                script_path,
+                sandbox,
+            )
+
         if not script_path.exists():
             return False, f"Custom script not found: {self.script}"
 

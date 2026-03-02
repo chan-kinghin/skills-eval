@@ -101,3 +101,24 @@ class ResultWriter:
             lines.append(f"Recommendation: {summary.recommendation}")
 
         summary_path.write_text("\n".join(lines))
+
+    async def write_trial_output_async(
+        self,
+        model: str,
+        trial_num: int,
+        output_text: str,
+        diff: str | None,
+        meta: dict,
+    ) -> None:
+        """Async wrapper for write_trial_output that runs I/O in a thread."""
+        import asyncio
+
+        await asyncio.to_thread(
+            self.write_trial_output, model, trial_num, output_text, diff, meta,
+        )
+
+    async def write_summary_async(self, summary: RunSummary) -> None:
+        """Async wrapper for write_summary that runs I/O in a thread."""
+        import asyncio
+
+        await asyncio.to_thread(self.write_summary, summary)

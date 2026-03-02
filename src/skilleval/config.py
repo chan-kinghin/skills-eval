@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from urllib.parse import urlparse
@@ -10,10 +11,13 @@ import yaml
 
 from skilleval.models import ModelEntry, TaskConfig, TaskFolder
 
+logger = logging.getLogger(__name__)
+
 
 def load_task(task_path: str | Path) -> TaskFolder:
     """Load and validate a complete task folder."""
     task_path = Path(task_path).resolve()
+    logger.debug("Loading task from %s", task_path)
 
     config_path = task_path / "config.yaml"
     if not config_path.exists():
@@ -25,9 +29,14 @@ def load_task(task_path: str | Path) -> TaskFolder:
     input_dir = task_path / "input"
     expected_dir = task_path / "expected"
 
-    if not input_dir.exists() or not any(input_dir.iterdir()):
+    input_files = sorted(p for p in input_dir.iterdir() if p.is_file() and not p.name.startswith("."))
+    expected_files = sorted(
+        p for p in expected_dir.iterdir() if p.is_file() and not p.name.startswith(".")
+    )
+
+    if not input_dir.exists() or not input_files:
         raise ValueError(f"input/ directory missing or empty in {task_path}")
-    if not expected_dir.exists() or not any(expected_dir.iterdir()):
+    if not expected_dir.exists() or not expected_files:
         raise ValueError(f"expected/ directory missing or empty in {task_path}")
 
     skill = _read_optional(task_path / "skill.md")
@@ -36,8 +45,8 @@ def load_task(task_path: str | Path) -> TaskFolder:
 
     return TaskFolder(
         path=task_path,
-        input_files=sorted(input_dir.iterdir()),
-        expected_files=sorted(expected_dir.iterdir()),
+        input_files=input_files,
+        expected_files=expected_files,
         config=config,
         skill=skill,
         prompt=prompt,
@@ -93,6 +102,7 @@ def _load_catalog_text(catalog_path: str | Path | None) -> str:
 
     for path in candidates:
         if path.exists():
+            logger.debug("Loading catalog from %s", path)
             return path.read_text()
 
     # Fall back to bundled default — read via Traversable to avoid
@@ -101,7 +111,9 @@ def _load_catalog_text(catalog_path: str | Path | None) -> str:
 
     ref = importlib.resources.files("skilleval") / "default_models.yaml"
     try:
-        return ref.read_text(encoding="utf-8")
+        text = ref.read_text(encoding="utf-8")
+        logger.debug("Loading catalog from bundled default_models.yaml")
+        return text
     except FileNotFoundError:
         pass
 
@@ -125,6 +137,7 @@ def filter_available(models: list[ModelEntry]) -> list[ModelEntry]:
         # Allow ad-hoc models that embed the API key directly
         if m.api_key and m.api_key.strip():
             available.append(m)
+    logger.debug("%d of %d models available after filtering", len(available), len(models))
     return available
 
 

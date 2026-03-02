@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +23,8 @@ from skilleval.models import (
     TrialResult,
 )
 from skilleval.results import ResultWriter
+
+logger = logging.getLogger(__name__)
 
 
 def _clean_output(text: str) -> str:
@@ -85,6 +89,11 @@ async def run_mode1(
     if not task.skill:
         raise ValueError("Mode 1 requires skill.md in the task folder")
 
+    logger.info(
+        "Mode 1 starting: %d models, %d trials each",
+        len(models), task.config.trials,
+    )
+
     writer = ResultWriter(task.path, "run")
     user_content = format_input_files(task.input_files)
     comparator_kwargs = {}
@@ -106,15 +115,21 @@ async def run_mode1(
             ))
 
     # Execute with progress tracking
-    with create_progress() as progress:
-        ptask = progress.add_task("Running trials...", total=len(specs))
+    interrupted = False
+    results: list[TrialResult] = []
+    try:
+        with create_progress() as progress:
+            ptask = progress.add_task("Running trials...", total=len(specs))
 
-        def on_progress(result: TrialResult) -> None:
-            progress.advance(ptask)
+            def on_progress(result: TrialResult) -> None:
+                progress.advance(ptask)
 
-        results = await engine.execute_batch(specs, on_progress=on_progress)
+            results = await engine.execute_batch(specs, on_progress=on_progress)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.warning("Run interrupted. Saving partial results...")
+        interrupted = True
 
-    # Compare outputs and finalize results
+    # Compare outputs and finalize results (runs even on interrupt)
     model_trials: dict[str, list[TrialResult]] = {}
     for trial in results:
         if trial.error:
@@ -124,6 +139,10 @@ async def run_mode1(
             passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
         trial.passed = passed
         trial.diff = diff
+        logger.debug(
+            "Comparison result: model=%s trial=%d passed=%s",
+            trial.model, trial.trial_number, passed,
+        )
 
         model_trials.setdefault(trial.model, []).append(trial)
 
@@ -149,6 +168,13 @@ async def run_mode1(
     # Recommendation
     recommendation = _compute_recommendation(model_results, task.config.trials)
 
+    total_passed = sum(1 for t in results if t.passed)
+    logger.info(
+        "Mode 1 %s: %d/%d trials passed across %d models",
+        "interrupted" if interrupted else "complete",
+        total_passed, len(results), len(model_results),
+    )
+
     summary = RunSummary(
         mode="run",
         task_path=str(task.path),
@@ -159,6 +185,9 @@ async def run_mode1(
     writer.write_summary(summary)
     console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
 
+    if interrupted:
+        raise KeyboardInterrupt
+
     return summary
 
 
@@ -166,9 +195,6 @@ def _compute_recommendation(results: list[ModelResult], num_trials: int) -> str 
     """Find the cheapest model with 100% pass rate."""
     perfect = [r for r in results if r.pass_rate == 1.0]
     if not perfect:
-        best = max(results, key=lambda r: r.pass_rate) if results else None
-        if best:
-            return None
         return None
 
     cheapest = min(perfect, key=lambda r: r.avg_cost)
@@ -188,6 +214,11 @@ async def run_mode2(
     if not task.prompt:
         raise ValueError("Mode 2 requires prompt.md in the task folder")
 
+    logger.info(
+        "Mode 2 starting: %d creators, %d executors, %d trials",
+        len(creators), len(executors), task.config.trials,
+    )
+
     writer = ResultWriter(task.path, "matrix")
     user_content = format_input_files(task.input_files)
     input_desc = input_descriptions(task.input_files)
@@ -196,6 +227,7 @@ async def run_mode2(
         comparator_kwargs["custom_script"] = task.config.custom_script
 
     # Phase 1: Skill Generation
+    interrupted = False
     console.print("[bold]Phase 1:[/bold] Generating skills...")
     creator_specs: list[TrialSpec] = []
     for creator in creators:
@@ -214,16 +246,24 @@ async def run_mode2(
             trial_number=1,
         ))
 
-    with create_progress() as progress:
-        ptask = progress.add_task("Generating skills...", total=len(creator_specs))
+    skill_results: list[TrialResult] = []
+    try:
+        with create_progress() as progress:
+            ptask = progress.add_task("Generating skills...", total=len(creator_specs))
 
-        def on_skill_progress(result: TrialResult) -> None:
-            progress.advance(ptask)
+            def on_skill_progress(result: TrialResult) -> None:
+                progress.advance(ptask)
 
-        skill_results = await engine.execute_batch(creator_specs, on_progress=on_skill_progress)
+            skill_results = await engine.execute_batch(creator_specs, on_progress=on_skill_progress)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.warning("Run interrupted during skill generation. Saving partial results...")
+        interrupted = True
 
     generated_skills: dict[str, str] = {}
     for i, creator in enumerate(creators):
+        if i >= len(skill_results):
+            generated_skills[creator.name] = ""
+            continue
         result = skill_results[i]
         if result.error:
             console.print(f"[red]Skill generation failed for {creator.name}: {result.error}[/red]")
@@ -233,36 +273,43 @@ async def run_mode2(
             writer.write_generated_skill(creator.name, result.output_text)
 
     # Phase 2: Execution
-    console.print("[bold]Phase 2:[/bold] Executing trials...")
+    exec_results: list[TrialResult] = []
     exec_specs: list[TrialSpec] = []
     spec_keys: list[tuple[str, str]] = []  # (creator, executor) per spec
 
-    for creator in creators:
-        skill_text = generated_skills[creator.name]
-        if not skill_text:
-            continue
-        for executor in executors:
-            for trial_num in range(1, task.config.trials + 1):
-                exec_specs.append(TrialSpec(
-                    model=executor,
-                    messages=[
-                        {"role": "system", "content": skill_text},
-                        {"role": "user", "content": user_content},
-                    ],
-                    config=task.config,
-                    trial_number=trial_num,
-                ))
-                spec_keys.append((creator.name, executor.name))
+    if not interrupted:
+        console.print("[bold]Phase 2:[/bold] Executing trials...")
 
-    with create_progress() as progress:
-        ptask = progress.add_task("Running trials...", total=len(exec_specs))
+        for creator in creators:
+            skill_text = generated_skills[creator.name]
+            if not skill_text:
+                continue
+            for executor in executors:
+                for trial_num in range(1, task.config.trials + 1):
+                    exec_specs.append(TrialSpec(
+                        model=executor,
+                        messages=[
+                            {"role": "system", "content": skill_text},
+                            {"role": "user", "content": user_content},
+                        ],
+                        config=task.config,
+                        trial_number=trial_num,
+                    ))
+                    spec_keys.append((creator.name, executor.name))
 
-        def on_exec_progress(result: TrialResult) -> None:
-            progress.advance(ptask)
+        try:
+            with create_progress() as progress:
+                ptask = progress.add_task("Running trials...", total=len(exec_specs))
 
-        exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+                def on_exec_progress(result: TrialResult) -> None:
+                    progress.advance(ptask)
 
-    # Compare and aggregate
+                exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logger.warning("Run interrupted during execution. Saving partial results...")
+            interrupted = True
+
+    # Compare and aggregate (runs even on interrupt)
     pair_trials: dict[tuple[str, str], list[TrialResult]] = {}
     for i, trial in enumerate(exec_results):
         cr_name, ex_name = spec_keys[i]
@@ -273,6 +320,10 @@ async def run_mode2(
             passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
         trial.passed = passed
         trial.diff = diff
+        logger.debug(
+            "Comparison result: creator=%s executor=%s trial=%d passed=%s",
+            cr_name, ex_name, trial.trial_number, passed,
+        )
 
         pair_trials.setdefault((cr_name, ex_name), []).append(trial)
 
@@ -312,6 +363,13 @@ async def run_mode2(
             f"(${cheapest.result.avg_cost:.6f}/run)"
         )
 
+    total_passed = sum(1 for t in exec_results if t.passed)
+    logger.info(
+        "Mode 2 %s: %d/%d trials passed across %d pairs",
+        "interrupted" if interrupted else "complete",
+        total_passed, len(exec_results), len(matrix_results),
+    )
+
     summary = RunSummary(
         mode="matrix",
         task_path=str(task.path),
@@ -321,6 +379,9 @@ async def run_mode2(
     )
     writer.write_summary(summary)
     console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+
+    if interrupted:
+        raise KeyboardInterrupt
 
     return summary
 
@@ -335,6 +396,11 @@ async def run_mode3(
     """Mode 3: Meta-skill x creator x executor chain."""
     if not task.prompt:
         raise ValueError("Mode 3 requires prompt.md in the task folder")
+
+    logger.info(
+        "Mode 3 starting: %d meta-skills, %d creators, %d executors, %d trials",
+        len(meta_skill_names), len(creators), len(executors), task.config.trials,
+    )
 
     writer = ResultWriter(task.path, "chain")
     user_content = format_input_files(task.input_files)
@@ -352,6 +418,7 @@ async def run_mode3(
             )
 
     # Phase 1: Skill Generation
+    interrupted = False
     console.print("[bold]Phase 1:[/bold] Generating skills with meta-skills...")
     gen_specs: list[TrialSpec] = []
     gen_keys: list[tuple[str, str]] = []  # (meta_skill_name, creator_name) per spec
@@ -378,16 +445,24 @@ async def run_mode3(
             ))
             gen_keys.append((ms_name, creator.name))
 
-    with create_progress() as progress:
-        ptask = progress.add_task("Generating skills...", total=len(gen_specs))
+    gen_results: list[TrialResult] = []
+    try:
+        with create_progress() as progress:
+            ptask = progress.add_task("Generating skills...", total=len(gen_specs))
 
-        def on_gen_progress(result: TrialResult) -> None:
-            progress.advance(ptask)
+            def on_gen_progress(result: TrialResult) -> None:
+                progress.advance(ptask)
 
-        gen_results = await engine.execute_batch(gen_specs, on_progress=on_gen_progress)
+            gen_results = await engine.execute_batch(gen_specs, on_progress=on_gen_progress)
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.warning("Run interrupted during skill generation. Saving partial results...")
+        interrupted = True
 
     generated_skills: dict[tuple[str, str], str] = {}
     for i, (ms_name, cr_name) in enumerate(gen_keys):
+        if i >= len(gen_results):
+            generated_skills[(ms_name, cr_name)] = ""
+            continue
         result = gen_results[i]
         if result.error:
             console.print(
@@ -399,37 +474,44 @@ async def run_mode3(
             writer.write_generated_skill(cr_name, result.output_text, meta_skill=ms_name)
 
     # Phase 2: Execution
-    console.print("[bold]Phase 2:[/bold] Executing trials...")
     exec_specs: list[TrialSpec] = []
     exec_keys: list[tuple[str, str, str]] = []  # (meta_skill, creator, executor)
+    exec_results: list[TrialResult] = []
 
-    for ms_name in meta_skill_names:
-        for creator in creators:
-            skill_text = generated_skills.get((ms_name, creator.name), "")
-            if not skill_text:
-                continue
-            for executor in executors:
-                for trial_num in range(1, task.config.trials + 1):
-                    exec_specs.append(TrialSpec(
-                        model=executor,
-                        messages=[
-                            {"role": "system", "content": skill_text},
-                            {"role": "user", "content": user_content},
-                        ],
-                        config=task.config,
-                        trial_number=trial_num,
-                    ))
-                    exec_keys.append((ms_name, creator.name, executor.name))
+    if not interrupted:
+        console.print("[bold]Phase 2:[/bold] Executing trials...")
 
-    with create_progress() as progress:
-        ptask = progress.add_task("Running trials...", total=len(exec_specs))
+        for ms_name in meta_skill_names:
+            for creator in creators:
+                skill_text = generated_skills.get((ms_name, creator.name), "")
+                if not skill_text:
+                    continue
+                for executor in executors:
+                    for trial_num in range(1, task.config.trials + 1):
+                        exec_specs.append(TrialSpec(
+                            model=executor,
+                            messages=[
+                                {"role": "system", "content": skill_text},
+                                {"role": "user", "content": user_content},
+                            ],
+                            config=task.config,
+                            trial_number=trial_num,
+                        ))
+                        exec_keys.append((ms_name, creator.name, executor.name))
 
-        def on_exec_progress(result: TrialResult) -> None:
-            progress.advance(ptask)
+        try:
+            with create_progress() as progress:
+                ptask = progress.add_task("Running trials...", total=len(exec_specs))
 
-        exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+                def on_exec_progress(result: TrialResult) -> None:
+                    progress.advance(ptask)
 
-    # Compare and aggregate
+                exec_results = await engine.execute_batch(exec_specs, on_progress=on_exec_progress)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logger.warning("Run interrupted during execution. Saving partial results...")
+            interrupted = True
+
+    # Compare and aggregate (runs even on interrupt)
     chain_trials: dict[tuple[str, str, str], list[TrialResult]] = {}
     for i, trial in enumerate(exec_results):
         ms_name, cr_name, ex_name = exec_keys[i]
@@ -440,6 +522,10 @@ async def run_mode3(
             passed, diff = _save_and_compare(task, trial.output_text, comparator_kwargs)
         trial.passed = passed
         trial.diff = diff
+        logger.debug(
+            "Comparison result: meta=%s creator=%s executor=%s trial=%d passed=%s",
+            ms_name, cr_name, ex_name, trial.trial_number, passed,
+        )
 
         chain_trials.setdefault((ms_name, cr_name, ex_name), []).append(trial)
 
@@ -481,6 +567,13 @@ async def run_mode3(
             f"(${cheapest.result.avg_cost:.6f}/run)"
         )
 
+    total_passed = sum(1 for t in exec_results if t.passed)
+    logger.info(
+        "Mode 3 %s: %d/%d trials passed across %d chains",
+        "interrupted" if interrupted else "complete",
+        total_passed, len(exec_results), len(chain_results),
+    )
+
     summary = RunSummary(
         mode="chain",
         task_path=str(task.path),
@@ -490,5 +583,8 @@ async def run_mode3(
     )
     writer.write_summary(summary)
     console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+
+    if interrupted:
+        raise KeyboardInterrupt
 
     return summary

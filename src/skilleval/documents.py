@@ -195,6 +195,20 @@ def format_input_files(input_files: list[Path]) -> str:
     return "\n\n".join(parts)
 
 
+async def extract_text_async(file_path: Path) -> str:
+    """Async wrapper for extract_text that runs I/O in a thread."""
+    import asyncio
+
+    return await asyncio.to_thread(extract_text, file_path)
+
+
+async def format_input_files_async(input_files: list[Path]) -> str:
+    """Async wrapper for format_input_files that runs I/O in a thread."""
+    import asyncio
+
+    return await asyncio.to_thread(format_input_files, input_files)
+
+
 def input_descriptions(input_files: list[Path], max_chars: int = 200) -> str:
     """Generate short descriptions of input files for skill generation prompts.
 

@@ -57,7 +57,7 @@ def lint_skill(skill_dir: Path) -> LintReport:
     issues: list[LintIssue] = []
 
     # 1) Locate the skill file
-    skill_file = _find_skill_file(skill_dir)
+    skill_file = find_skill_file(skill_dir)
     if skill_file is None:
         issues.append(LintIssue("error", "Skill file not found (skill.md or SKILL.md)."))
         return _finalize_report(issues, skill_dir)
@@ -70,7 +70,7 @@ def lint_skill(skill_dir: Path) -> LintReport:
         return _finalize_report(issues, skill_file)
 
     # 3) Extract frontmatter and body
-    fm, fm_end_line, body, body_start_line = _extract_frontmatter(text)
+    fm, fm_end_line, body, body_start_line = extract_frontmatter(text)
     if fm is None:
         issues.append(LintIssue("error", "Missing YAML frontmatter (--- ... ---) at top of file.", line=1))
     else:
@@ -86,7 +86,7 @@ def lint_skill(skill_dir: Path) -> LintReport:
                 )
 
     # 4) Parse body for headings and code blocks (ignoring code fence contents for headings)
-    headings = _collect_headings(body, base_line=body_start_line)
+    headings = collect_headings(body, base_line=body_start_line)
     code_blocks = _collect_code_blocks(body, base_line=body_start_line)
 
     # 5) Phase/step structure
@@ -141,7 +141,7 @@ def lint_skill(skill_dir: Path) -> LintReport:
 # -----------------------------
 
 
-def _find_skill_file(skill_dir: Path) -> Path | None:
+def find_skill_file(skill_dir: Path) -> Path | None:
     # Use directory listing for case-sensitive matching (macOS FS is case-insensitive)
     try:
         entries = {e.name: e for e in skill_dir.iterdir() if e.is_file()}
@@ -153,7 +153,7 @@ def _find_skill_file(skill_dir: Path) -> Path | None:
     return None
 
 
-def _extract_frontmatter(text: str) -> tuple[dict | None, int, str, int]:
+def extract_frontmatter(text: str) -> tuple[dict | None, int, str, int]:
     """Extract YAML frontmatter and return (frontmatter, fm_end_line, body, body_start_line).
 
     If no frontmatter is found at the top, returns (None, 0, original_text, 1).
@@ -184,7 +184,7 @@ def _extract_frontmatter(text: str) -> tuple[dict | None, int, str, int]:
 
 
 @dataclass
-class _Heading:
+class Heading:
     level: int
     text: str
     line: int
@@ -197,8 +197,8 @@ class _CodeBlock:
     start_line: int
 
 
-def _collect_headings(text: str, base_line: int = 1) -> list[_Heading]:
-    headings: list[_Heading] = []
+def collect_headings(text: str, base_line: int = 1) -> list[Heading]:
+    headings: list[Heading] = []
     in_code = False
     line_no = base_line - 1
     for raw_line in text.splitlines():
@@ -217,7 +217,7 @@ def _collect_headings(text: str, base_line: int = 1) -> list[_Heading]:
         if m:
             level = len(m.group(1))
             text_content = m.group(2).strip()
-            headings.append(_Heading(level=level, text=text_content, line=line_no))
+            headings.append(Heading(level=level, text=text_content, line=line_no))
     return headings
 
 
@@ -249,7 +249,7 @@ def _collect_code_blocks(text: str, base_line: int = 1) -> list[_CodeBlock]:
     return blocks
 
 
-def _has_numbered_phases(headings: Iterable[_Heading]) -> bool:
+def _has_numbered_phases(headings: Iterable[Heading]) -> bool:
     phase_re = re.compile(r"^(?:phase|step)\s+\d+\b", re.IGNORECASE)
     for h in headings:
         if h.level in (2, 3) and phase_re.search(h.text):
@@ -257,7 +257,7 @@ def _has_numbered_phases(headings: Iterable[_Heading]) -> bool:
     return False
 
 
-def _has_error_handling_section(headings: Iterable[_Heading]) -> bool:
+def _has_error_handling_section(headings: Iterable[Heading]) -> bool:
     err_re = re.compile(r"error\s+handling", re.IGNORECASE)
     for h in headings:
         if h.level in (2, 3) and err_re.search(h.text):
@@ -265,7 +265,7 @@ def _has_error_handling_section(headings: Iterable[_Heading]) -> bool:
     return False
 
 
-def _has_rules_section(headings: Iterable[_Heading]) -> bool:
+def _has_rules_section(headings: Iterable[Heading]) -> bool:
     rules_re = re.compile(r"\brules\b", re.IGNORECASE)
     for h in headings:
         if h.level in (2, 3) and rules_re.search(h.text):

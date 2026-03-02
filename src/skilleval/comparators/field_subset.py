@@ -91,8 +91,10 @@ class FieldSubsetComparator:
                 self._check_subset(exp_item, out_item, f"{path}[{i}]", errors)
 
         else:
-            # Scalar comparison: types must match exactly
-            if type(expected) is not type(output) or expected != output:
+            # Scalar comparison: normalize int/float per JSON RFC 8259
+            exp_val = float(expected) if isinstance(expected, int) and not isinstance(expected, bool) else expected
+            out_val = float(output) if isinstance(output, int) and not isinstance(output, bool) else output
+            if type(exp_val) is not type(out_val) or exp_val != out_val:
                 errors.append(
                     f"{path}: expected {json.dumps(expected)}, got {json.dumps(output)}"
                 )

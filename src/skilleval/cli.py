@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
+import sys
 import webbrowser
 from pathlib import Path
 
@@ -55,10 +57,52 @@ def _inject_adhoc(
 # ── CLI Group ────────────────────────────────────────────────────────────
 
 
+def _configure_logging(verbosity: int) -> None:
+    """Configure the logging level and format based on CLI verbosity.
+
+    Logging output goes to stderr so it does not interfere with Rich console
+    output on stdout.
+    """
+    if verbosity == 0:
+        level = logging.WARNING
+    elif verbosity == 1:
+        level = logging.INFO
+    else:
+        level = logging.DEBUG
+
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+
+    root_logger = logging.getLogger("skilleval")
+    root_logger.setLevel(level)
+    # Avoid duplicate handlers if the CLI group is invoked more than once
+    # (e.g. in tests using CliRunner).
+    if not root_logger.handlers:
+        root_logger.addHandler(handler)
+    else:
+        root_logger.handlers[0] = handler
+        root_logger.setLevel(level)
+
+
 @click.group()
 @click.version_option(package_name="skilleval")
-def cli() -> None:
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Increase verbosity (-v for INFO, -vv for DEBUG).",
+)
+@click.pass_context
+def cli(ctx: click.Context, verbose: int) -> None:
     """SkillEval: Find the cheapest model that gets your task 100% right."""
+    ctx.ensure_object(dict)
+    ctx.obj["verbosity"] = verbose
+    _configure_logging(verbose)
 
 
 @cli.command()
@@ -171,10 +215,18 @@ def run(
                 "No models available. Set API key env vars or use --models to specify."
             )
 
+        num_calls = len(selected) * task.config.trials
+        avg_input_cost = sum(m.input_cost_per_m for m in selected) / len(selected)
+        avg_output_cost = sum(m.output_cost_per_m for m in selected) / len(selected)
+        estimated_cost = num_calls * (
+            1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
+        )
+
         console.print("[bold]Mode 1: Skill Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Models: {', '.join(m.name for m in selected)}")
         console.print(f"Trials: {task.config.trials}")
+        display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode1(task, selected, parallel))
         display_run_results(summary.model_results, summary.recommendation)
@@ -231,11 +283,18 @@ def matrix(
         executor_models = filter_by_names(catalog, executors.split(","))
 
         num_calls = len(creator_models) + len(creator_models) * len(executor_models) * task.config.trials
+        all_models = creator_models + executor_models
+        avg_input_cost = sum(m.input_cost_per_m for m in all_models) / len(all_models)
+        avg_output_cost = sum(m.output_cost_per_m for m in all_models) / len(all_models)
+        estimated_cost = num_calls * (
+            1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
+        )
+
         console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
         console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
-        display_pre_run_estimate(num_calls, 0.0)
+        display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode2(task, creator_models, executor_models, parallel))
         display_matrix_results(summary.matrix_results)
@@ -267,7 +326,7 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
 @click.option("--trials", default=None, type=int, help="Override trial count from config")
 @click.option("--parallel", default=20, type=int, help="Max concurrent API calls")
 @click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
-@click.option("--confirm", is_flag=True, help="Skip confirmation for large runs")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation for large runs")
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
@@ -279,7 +338,7 @@ def chain(
     trials: int | None,
     parallel: int,
     catalog_path: str | None,
-    confirm: bool,
+    yes: bool,
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
@@ -312,15 +371,21 @@ def chain(
         gen_calls = len(meta_skill_names) * len(creator_models)
         exec_calls = len(meta_skill_names) * len(creator_models) * len(executor_models) * task.config.trials
         total_calls = gen_calls + exec_calls
+        all_models = creator_models + executor_models
+        avg_input_cost = sum(m.input_cost_per_m for m in all_models) / len(all_models)
+        avg_output_cost = sum(m.output_cost_per_m for m in all_models) / len(all_models)
+        estimated_cost = total_calls * (
+            1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
+        )
 
         console.print("[bold]Mode 3: Chain Evaluation[/bold]")
         console.print(f"Task: {task.path}")
         console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
         console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
         console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
-        display_pre_run_estimate(total_calls, 0.0)
+        display_pre_run_estimate(total_calls, estimated_cost)
 
-        if total_calls > 100 and not confirm:
+        if total_calls > 100 and not yes:
             if not click.confirm("Proceed with this run?"):
                 click.echo("Aborted.")
                 return

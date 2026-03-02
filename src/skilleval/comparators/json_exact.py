@@ -36,8 +36,8 @@ def _canonical(obj: object) -> str:
 class JsonExactComparator:
     """Deep-equality JSON comparison.
 
-    Types matter: 1 != 1.0, null != missing key.
-    Extra keys in output = fail (must be exact match).
+    Numbers are normalized: 1 == 1.0 (per JSON RFC 8259).
+    Null != missing key. Extra keys in output = fail (must be exact match).
     Whitespace/formatting differences are ignored.
     """
 

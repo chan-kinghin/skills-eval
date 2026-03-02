@@ -14,12 +14,11 @@ import re
 
 import yaml
 
-# We intentionally import linter internals as per task instructions
 from skilleval.linter import (
-    _Heading,
-    _collect_headings,
-    _extract_frontmatter,
-    _find_skill_file,
+    Heading,
+    collect_headings,
+    extract_frontmatter,
+    find_skill_file,
 )
 from skilleval.models import TaskConfig, TaskFolder
 
@@ -51,12 +50,12 @@ def parse_skill(skill_dir: Path) -> SkillPrompt:
     - Extracts phase names from headings (e.g., "## Phase 1 — Name")
     """
 
-    skill_file = _find_skill_file(skill_dir)
+    skill_file = find_skill_file(skill_dir)
     if skill_file is None:
         raise FileNotFoundError("Skill file not found (skill.md or SKILL.md)")
 
     text = skill_file.read_text(encoding="utf-8")
-    fm, _fm_end, body, body_start = _extract_frontmatter(text)
+    fm, _fm_end, body, body_start = extract_frontmatter(text)
 
     name = ""
     description = ""
@@ -68,7 +67,7 @@ def parse_skill(skill_dir: Path) -> SkillPrompt:
     core_prompt = _strip_tool_scaffolding(body)
 
     # Extract phases from headings in the body
-    phases = _extract_phase_names(_collect_headings(body, base_line=body_start))
+    phases = _extract_phase_names(collect_headings(body, base_line=body_start))
 
     return SkillPrompt(
         name=name,
@@ -210,7 +209,7 @@ def _is_scaffolding_line(line: str) -> bool:
     return False
 
 
-def _extract_phase_names(headings: list[_Heading]) -> list[str]:
+def _extract_phase_names(headings: list[Heading]) -> list[str]:
     """Extract phase names from headings like '## Phase 1 — Setup'."""
 
     phases: list[str] = []
