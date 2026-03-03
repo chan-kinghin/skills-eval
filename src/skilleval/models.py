@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ModelEntry(BaseModel):
@@ -78,8 +77,7 @@ class TaskFolder(BaseModel):
     meta_skills: dict[str, str] = Field(default_factory=dict)
 
 
-@dataclass
-class ChatResponse:
+class ChatResponse(BaseModel):
     """Response from a model API call."""
 
     content: str
@@ -88,6 +86,20 @@ class ChatResponse:
     latency_seconds: float
     model_version: str | None = None
     finish_reason: str | None = None
+
+    @field_validator("input_tokens", "output_tokens")
+    @classmethod
+    def _tokens_non_negative(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Token count must be non-negative")
+        return v
+
+    @field_validator("latency_seconds")
+    @classmethod
+    def _latency_non_negative(cls, v: float) -> float:
+        if v < 0:
+            raise ValueError("Latency must be non-negative")
+        return v
 
 
 class TrialResult(BaseModel):

@@ -6,7 +6,7 @@ import difflib
 import json
 from pathlib import Path
 
-from skilleval.comparators.base import get_file_pairs, strip_markdown_fences
+from skilleval.comparators.base import FileComparator, strip_markdown_fences
 
 
 def _normalize_numbers(obj: object) -> object:
@@ -33,29 +33,13 @@ def _canonical(obj: object) -> str:
     return json.dumps(normalized, sort_keys=True, indent=2, ensure_ascii=False)
 
 
-class JsonExactComparator:
+class JsonExactComparator(FileComparator):
     """Deep-equality JSON comparison.
 
     Numbers are normalized: 1 == 1.0 (per JSON RFC 8259).
     Null != missing key. Extra keys in output = fail (must be exact match).
     Whitespace/formatting differences are ignored.
     """
-
-    def compare(self, output_dir: Path, expected_dir: Path) -> tuple[bool, str | None]:
-        try:
-            pairs = get_file_pairs(output_dir, expected_dir)
-        except ValueError as e:
-            return False, str(e)
-
-        diffs: list[str] = []
-        for output_file, expected_file in pairs:
-            passed, diff = self._compare_files(output_file, expected_file)
-            if not passed:
-                diffs.append(f"--- {expected_file.name} vs {output_file.name} ---\n{diff}")
-
-        if diffs:
-            return False, "\n\n".join(diffs)
-        return True, None
 
     def _compare_files(self, output_file: Path, expected_file: Path) -> tuple[bool, str]:
         try:

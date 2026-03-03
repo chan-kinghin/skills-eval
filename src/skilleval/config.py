@@ -30,13 +30,6 @@ def _validate_config(raw: dict, config_path: Path) -> TaskConfig:
             ", ".join(sorted(unknown)),
             ", ".join(sorted(_KNOWN_CONFIG_KEYS)),
         )
-        import click
-
-        click.echo(
-            f"Warning: Unknown config keys in {config_path.name}: "
-            f"{', '.join(sorted(unknown))}",
-            err=True,
-        )
 
     config = TaskConfig(**{k: v for k, v in raw.items() if k in _KNOWN_CONFIG_KEYS})
 
@@ -65,14 +58,19 @@ def load_task(task_path: str | Path) -> TaskFolder:
     input_dir = task_path / "input"
     expected_dir = task_path / "expected"
 
+    if not input_dir.exists():
+        raise ValueError(f"input/ directory missing or empty in {task_path}")
+    if not expected_dir.exists():
+        raise ValueError(f"expected/ directory missing or empty in {task_path}")
+
     input_files = sorted(p for p in input_dir.iterdir() if p.is_file() and not p.name.startswith("."))
     expected_files = sorted(
         p for p in expected_dir.iterdir() if p.is_file() and not p.name.startswith(".")
     )
 
-    if not input_dir.exists() or not input_files:
+    if not input_files:
         raise ValueError(f"input/ directory missing or empty in {task_path}")
-    if not expected_dir.exists() or not expected_files:
+    if not expected_files:
         raise ValueError(f"expected/ directory missing or empty in {task_path}")
 
     skill = _read_optional(task_path / "skill.md")

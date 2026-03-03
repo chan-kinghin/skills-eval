@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import logging
 import sys
@@ -65,6 +67,47 @@ def _inject_adhoc(
     catalog.append(build_adhoc_model(endpoint, api_key or "", model_name))
 
 
+def _resolve_output_format(output: str | None, json_output: bool) -> str:
+    """Resolve the effective output format from --output and --json flags."""
+    if output is not None:
+        return output
+    return "json" if json_output else "rich"
+
+
+def _write_run_csv(results: list[ModelResult]) -> str:
+    """Serialize Mode 1 results to CSV."""
+    buf = io.StringIO(newline="")
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(["model", "pass_rate", "avg_cost", "avg_latency", "total_cost"])
+    for r in sorted(results, key=lambda x: (-x.pass_rate, x.avg_cost)):
+        writer.writerow([r.model, f"{r.pass_rate:.4f}", f"{r.avg_cost:.6f}",
+                         f"{r.avg_latency:.2f}", f"{r.total_cost:.6f}"])
+    return buf.getvalue()
+
+
+def _write_matrix_csv(cells: list) -> str:
+    """Serialize Mode 2 matrix results to CSV."""
+    buf = io.StringIO(newline="")
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(["creator", "executor", "pass_rate", "avg_cost", "total_cost"])
+    for c in cells:
+        writer.writerow([c.creator, c.executor, f"{c.result.pass_rate:.4f}",
+                         f"{c.result.avg_cost:.6f}", f"{c.result.total_cost:.6f}"])
+    return buf.getvalue()
+
+
+def _write_chain_csv(cells: list) -> str:
+    """Serialize Mode 3 chain results to CSV."""
+    buf = io.StringIO(newline="")
+    writer = csv.writer(buf, lineterminator="\n")
+    writer.writerow(["meta_skill", "creator", "executor", "pass_rate", "avg_cost", "total_cost"])
+    for c in cells:
+        writer.writerow([c.meta_skill_name, c.creator, c.executor,
+                         f"{c.result.pass_rate:.4f}", f"{c.result.avg_cost:.6f}",
+                         f"{c.result.total_cost:.6f}"])
+    return buf.getvalue()
+
+
 # ── CLI Group ────────────────────────────────────────────────────────────
 
 
@@ -118,7 +161,7 @@ class _SkillEvalGroup(click.Group):
             verbosity = ctx.obj.get("verbosity", 0) if ctx.obj else 0
             if verbosity >= 2:
                 raise
-            console.print(f"\n[red]Error:[/red] {e}")
+            console.print(f"\n[red]Error:[/red] {type(e).__name__}: {e}")
             console.print("[dim]Use -vv for full traceback.[/dim]")
             ctx.exit(1)
 
@@ -150,6 +193,13 @@ def init(name: str) -> None:
     task_path.mkdir(parents=True)
     (task_path / "input").mkdir()
     (task_path / "expected").mkdir()
+
+    (task_path / "input" / "sample.txt").write_text(
+        "Replace this file with your actual input data.\n"
+    )
+    (task_path / "expected" / "sample.txt").write_text(
+        "Replace this file with the expected output for sample.txt.\n"
+    )
 
     (task_path / "prompt.md").write_text(
         "# Task Description\n\n"
@@ -221,7 +271,11 @@ def init(name: str) -> None:
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
+@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
+              help="Output format (default: rich)")
+@click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
+@click.option("--resume", "resume_dir", default=None,
+              help="Resume a previous run from a checkpoint directory")
 def run(
     task_path: str,
     models: str | None,
@@ -231,10 +285,30 @@ def run(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    output_fmt: str | None,
     json_output: bool,
+    resume_dir: str | None,
 ) -> None:
     """Mode 1: Evaluate models with a given skill."""
     try:
+        fmt = _resolve_output_format(output_fmt, json_output)
+
+        # Load checkpoint if resuming
+        completed_models: set[str] = set()
+        if resume_dir:
+            checkpoint_file = Path(resume_dir) / "checkpoint.json"
+            if checkpoint_file.exists():
+                checkpoint = json.loads(checkpoint_file.read_text())
+                completed_models = set(checkpoint.get("completed_models", []))
+                if fmt == "rich":
+                    console.print(
+                        f"[bold]Resuming:[/bold] skipping {len(completed_models)} "
+                        f"completed model(s): {', '.join(sorted(completed_models))}"
+                    )
+            else:
+                if fmt == "rich":
+                    console.print("[yellow]No checkpoint found, starting fresh.[/yellow]")
+
         task = load_task(task_path)
         if not task.skill:
             raise click.ClickException("Mode 1 requires skill.md in the task folder")
@@ -253,6 +327,14 @@ def run(
         if not selected:
             raise _no_models_error(catalog)
 
+        # Filter out already-completed models when resuming
+        if completed_models:
+            selected = [m for m in selected if m.name not in completed_models]
+            if not selected:
+                if fmt == "rich":
+                    console.print("[bold green]All models already completed.[/bold green]")
+                return
+
         num_calls = len(selected) * task.config.trials
         avg_input_cost = sum(m.input_cost_per_m for m in selected) / len(selected)
         avg_output_cost = sum(m.output_cost_per_m for m in selected) / len(selected)
@@ -260,7 +342,7 @@ def run(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        if not json_output:
+        if fmt == "rich":
             console.print("[bold]Mode 1: Skill Evaluation[/bold]")
             console.print(f"Task: {task.path}")
             console.print(f"Models: {', '.join(m.name for m in selected)}")
@@ -269,8 +351,10 @@ def run(
 
         summary = asyncio.run(_run_mode1(task, selected, parallel))
 
-        if json_output:
+        if fmt == "json":
             click.echo(summary.model_dump_json(indent=2))
+        elif fmt == "csv":
+            click.echo(_write_run_csv(summary.model_results), nl=False)
         else:
             display_run_results(summary.model_results, summary.recommendation)
 
@@ -299,7 +383,9 @@ async def _run_mode1(task, selected, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
+@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
+              help="Output format (default: rich)")
+@click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
 def matrix(
     task_path: str,
     creators: str,
@@ -310,10 +396,13 @@ def matrix(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    output_fmt: str | None,
     json_output: bool,
 ) -> None:
     """Mode 2: Creator x executor matrix evaluation."""
     try:
+        fmt = _resolve_output_format(output_fmt, json_output)
+
         task = load_task(task_path)
         if not task.prompt:
             raise click.ClickException("Mode 2 requires prompt.md in the task folder")
@@ -335,7 +424,7 @@ def matrix(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        if not json_output:
+        if fmt == "rich":
             console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
             console.print(f"Task: {task.path}")
             console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
@@ -344,8 +433,10 @@ def matrix(
 
         summary = asyncio.run(_run_mode2(task, creator_models, executor_models, parallel))
 
-        if json_output:
+        if fmt == "json":
             click.echo(summary.model_dump_json(indent=2))
+        elif fmt == "csv":
+            click.echo(_write_matrix_csv(summary.matrix_results), nl=False)
         else:
             display_matrix_results(summary.matrix_results)
             if summary.recommendation:
@@ -379,7 +470,9 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
+@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
+              help="Output format (default: rich)")
+@click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
 def chain(
     task_path: str,
     meta_skills: str,
@@ -392,10 +485,13 @@ def chain(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    output_fmt: str | None,
     json_output: bool,
 ) -> None:
     """Mode 3: Meta-skill x creator x executor chain evaluation."""
     try:
+        fmt = _resolve_output_format(output_fmt, json_output)
+
         task = load_task(task_path)
         if not task.prompt:
             raise click.ClickException("Mode 3 requires prompt.md in the task folder")
@@ -429,7 +525,7 @@ def chain(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        if not json_output:
+        if fmt == "rich":
             console.print("[bold]Mode 3: Chain Evaluation[/bold]")
             console.print(f"Task: {task.path}")
             console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
@@ -446,8 +542,10 @@ def chain(
             _run_mode3(task, meta_skill_names, creator_models, executor_models, parallel)
         )
 
-        if json_output:
+        if fmt == "json":
             click.echo(summary.model_dump_json(indent=2))
+        elif fmt == "csv":
+            click.echo(_write_chain_csv(summary.chain_results), nl=False)
         else:
             display_chain_results(summary.chain_results)
             if summary.recommendation:
@@ -642,9 +740,11 @@ def skill_test(
 
 
 async def _run_skill_test(cases, selected, parallel):
-    """Run all test cases through Mode 1 with a single shared engine."""
+    """Run all test cases through Mode 1 concurrently with a single shared engine."""
     from skilleval.engine import ExecutionEngine
     from skilleval.runner import run_mode1
 
     async with ExecutionEngine(selected, max_global=parallel) as engine:
-        return [await run_mode1(case, selected, engine, parallel) for case in cases]
+        return await asyncio.gather(
+            *(run_mode1(case, selected, engine, parallel) for case in cases)
+        )

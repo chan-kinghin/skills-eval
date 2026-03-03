@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
 from skilleval.client import ApiError, ModelClient, RateLimitError, TimeoutError, compute_cost
 from skilleval.models import ModelEntry, TaskConfig, TrialResult
+from skilleval.settings import get_settings
 
 logger = logging.getLogger(__name__)
-
-_CIRCUIT_BREAKER_THRESHOLD = 5
 
 
 @dataclass
@@ -20,7 +20,7 @@ class TrialSpec:
     """Specification for a single trial to execute."""
 
     model: ModelEntry
-    messages: list[dict]
+    messages: list[dict[str, str]]
     config: TaskConfig
     trial_number: int
 
@@ -31,20 +31,23 @@ class ExecutionEngine:
     def __init__(
         self,
         models: list[ModelEntry],
-        max_per_provider: int = 5,
-        max_global: int = 20,
+        max_per_provider: int | None = None,
+        max_global: int | None = None,
     ) -> None:
+        settings = get_settings()
         self._models = models
-        self._max_per_provider = max_per_provider
-        self._max_global = max_global
+        self._max_per_provider = max_per_provider or settings.max_per_provider
+        self._max_global = max_global or settings.max_global
+        self._circuit_breaker_threshold = settings.circuit_breaker_threshold
         self._client: ModelClient | None = None
+        self._exit_stack: contextlib.AsyncExitStack | None = None
         self._global_semaphore: asyncio.Semaphore | None = None
         self._provider_semaphores: dict[str, asyncio.Semaphore] = {}
         self._failure_counts: dict[str, int] = {}
 
     async def __aenter__(self) -> ExecutionEngine:
-        self._client = ModelClient()
-        await self._client.__aenter__()
+        self._exit_stack = contextlib.AsyncExitStack()
+        self._client = await self._exit_stack.enter_async_context(ModelClient())
         self._global_semaphore = asyncio.Semaphore(self._max_global)
         self._provider_semaphores = {
             m.provider: asyncio.Semaphore(self._max_per_provider)
@@ -53,8 +56,9 @@ class ExecutionEngine:
         return self
 
     async def __aexit__(self, exc_type: type | None, exc: Exception | None, tb: object) -> None:
-        if self._client:
-            await self._client.__aexit__(exc_type, exc, tb)
+        if self._exit_stack:
+            await self._exit_stack.aclose()
+            self._exit_stack = None
             self._client = None
 
     async def execute_trial(
@@ -76,7 +80,7 @@ class ExecutionEngine:
         logger.debug("Starting trial %d for model %s", trial_number, model.name)
 
         # Circuit breaker: skip remaining trials if a provider has too many consecutive failures
-        if self._failure_counts.get(model.provider, 0) >= _CIRCUIT_BREAKER_THRESHOLD:
+        if self._failure_counts.get(model.provider, 0) >= self._circuit_breaker_threshold:
             logger.warning(
                 "Circuit breaker open for %s — skipping trial %d for %s",
                 model.provider, trial_number, model.name,
@@ -85,7 +89,7 @@ class ExecutionEngine:
                 model=model.name,
                 trial_number=trial_number,
                 passed=False,
-                error=f"Circuit breaker open: {model.provider} had {_CIRCUIT_BREAKER_THRESHOLD} consecutive failures",
+                error=f"Circuit breaker open: {model.provider} had {self._circuit_breaker_threshold} consecutive failures",
             )
 
         try:

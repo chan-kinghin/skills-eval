@@ -110,3 +110,51 @@
   output_cost_per_m: 1.10
   env_key: MINIMAX_API_KEY
   context_window: 204800
+
+# =============================================================================
+# OPENAI
+# Signup: https://platform.openai.com/
+# Env var: OPENAI_API_KEY
+# =============================================================================
+
+# Frontier — OpenAI's latest flagship, best quality across tasks
+- name: gpt-4o
+  provider: openai
+  endpoint: https://api.openai.com/v1/chat/completions
+  input_cost_per_m: 2.50
+  output_cost_per_m: 10.00
+  env_key: OPENAI_API_KEY
+  context_window: 128000
+
+# Budget — Small, fast, and very cheap for simple tasks
+- name: gpt-4o-mini
+  provider: openai
+  endpoint: https://api.openai.com/v1/chat/completions
+  input_cost_per_m: 0.15
+  output_cost_per_m: 0.60
+  env_key: OPENAI_API_KEY
+  context_window: 128000
+
+# =============================================================================
+# DEEPSEEK
+# Signup: https://platform.deepseek.com/
+# Env var: DEEPSEEK_API_KEY
+# =============================================================================
+
+# Frontier — DeepSeek's general-purpose chat model, very cost-effective
+- name: deepseek-chat
+  provider: deepseek
+  endpoint: https://api.deepseek.com/v1/chat/completions
+  input_cost_per_m: 0.14
+  output_cost_per_m: 0.28
+  env_key: DEEPSEEK_API_KEY
+  context_window: 128000
+
+# Reasoning — DeepSeek's reasoning model with chain-of-thought
+- name: deepseek-reasoner
+  provider: deepseek
+  endpoint: https://api.deepseek.com/v1/chat/completions
+  input_cost_per_m: 0.55
+  output_cost_per_m: 2.19
+  env_key: DEEPSEEK_API_KEY
+  context_window: 128000

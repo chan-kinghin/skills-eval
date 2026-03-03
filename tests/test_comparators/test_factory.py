@@ -11,6 +11,8 @@ from skilleval.comparators import (
     FieldSubsetComparator,
     FileHashComparator,
     JsonExactComparator,
+    TextContainsComparator,
+    TextExactComparator,
     get_comparator,
 )
 
@@ -24,6 +26,8 @@ class TestGetComparator:
             ("csv_unordered", CsvUnorderedComparator),
             ("field_subset", FieldSubsetComparator),
             ("file_hash", FileHashComparator),
+            ("text_exact", TextExactComparator),
+            ("text_contains", TextContainsComparator),
         ],
     )
     def test_known_comparators(self, name: str, expected_cls: type):
@@ -41,9 +45,10 @@ class TestGetComparator:
         with pytest.raises(ValueError, match="json_exact"):
             get_comparator("bad_name")
 
-    def test_all_six_registered(self):
+    def test_all_registered(self):
         expected_names = {
             "json_exact", "csv_ordered", "csv_unordered",
-            "field_subset", "file_hash", "custom",
+            "field_subset", "file_hash", "text_exact",
+            "text_contains", "custom",
         }
         assert set(COMPARATORS.keys()) == expected_names

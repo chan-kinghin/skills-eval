@@ -114,17 +114,22 @@ def _make_model_result(
     )
 
 
+def _to_candidates(results: list[ModelResult]) -> list[tuple[str, ModelResult]]:
+    """Convert a list of ModelResults to (label, result) pairs for _compute_recommendation."""
+    return [(r.model, r) for r in results]
+
+
 class TestComputeRecommendation:
     def test_no_results(self):
         assert _compute_recommendation([], num_trials=5) is None
 
     def test_no_perfect_model(self):
         results = [_make_model_result("m1", 0.8, 0.001)]
-        assert _compute_recommendation(results, num_trials=5) is None
+        assert _compute_recommendation(_to_candidates(results), num_trials=5) is None
 
     def test_one_perfect_model(self):
         results = [_make_model_result("m1", 1.0, 0.005)]
-        rec = _compute_recommendation(results, num_trials=10)
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
         assert rec is not None
         assert "m1" in rec
         assert "$0.005000" in rec
@@ -135,20 +140,20 @@ class TestComputeRecommendation:
             _make_model_result("cheap", 1.0, 0.002),
             _make_model_result("mid", 1.0, 0.005),
         ]
-        rec = _compute_recommendation(results, num_trials=10)
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
         assert rec is not None
         assert "cheap" in rec
 
     def test_warning_when_trials_under_10(self):
         results = [_make_model_result("m1", 1.0, 0.001)]
-        rec = _compute_recommendation(results, num_trials=5)
+        rec = _compute_recommendation(_to_candidates(results), num_trials=5)
         assert rec is not None
         assert "warning" in rec.lower()
         assert "trials < 10" in rec
 
     def test_no_warning_at_10_trials(self):
         results = [_make_model_result("m1", 1.0, 0.001)]
-        rec = _compute_recommendation(results, num_trials=10)
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
         assert rec is not None
         assert "warning" not in rec.lower()
 
@@ -157,6 +162,6 @@ class TestComputeRecommendation:
             _make_model_result("bad", 0.9, 0.0001),
             _make_model_result("good", 1.0, 0.010),
         ]
-        rec = _compute_recommendation(results, num_trials=10)
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
         assert rec is not None
         assert "good" in rec

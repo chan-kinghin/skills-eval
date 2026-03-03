@@ -161,6 +161,8 @@ class TestRunMode1:
         # Mock ResultWriter instance
         mock_writer = MagicMock()
         mock_writer.run_dir = tmp_path / ".skilleval" / "run-test"
+        mock_writer.write_trial_output_async = AsyncMock()
+        mock_writer.write_summary_async = AsyncMock()
         mock_writer_cls.return_value = mock_writer
 
         summary = await run_mode1(task, [model], mock_engine, parallel=5)
@@ -207,6 +209,8 @@ class TestRunMode1:
 
         mock_writer = MagicMock()
         mock_writer.run_dir = tmp_path / ".skilleval" / "run-test"
+        mock_writer.write_trial_output_async = AsyncMock()
+        mock_writer.write_summary_async = AsyncMock()
         mock_writer_cls.return_value = mock_writer
 
         summary = await run_mode1(task, [model], mock_engine, parallel=5)
@@ -303,6 +307,8 @@ class TestRunMode2:
 
         mock_writer = MagicMock()
         mock_writer.run_dir = tmp_path / ".skilleval" / "run-test"
+        mock_writer.write_trial_output_async = AsyncMock()
+        mock_writer.write_summary_async = AsyncMock()
         mock_writer_cls.return_value = mock_writer
 
         summary = await run_mode2(task, [creator], [executor], mock_engine)
@@ -406,6 +412,8 @@ class TestRunMode3:
 
         mock_writer = MagicMock()
         mock_writer.run_dir = tmp_path / ".skilleval" / "run-test"
+        mock_writer.write_trial_output_async = AsyncMock()
+        mock_writer.write_summary_async = AsyncMock()
         mock_writer_cls.return_value = mock_writer
 
         summary = await run_mode3(

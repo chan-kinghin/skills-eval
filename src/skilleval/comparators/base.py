@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import abc
 import re
 from pathlib import Path
 from typing import Protocol
@@ -15,6 +16,35 @@ class Comparator(Protocol):
 
         Returns (passed, diff_text). diff_text is None on pass.
         """
+        ...
+
+
+class FileComparator(abc.ABC):
+    """Base class for file-based comparators using the template method pattern.
+
+    Subclasses only need to implement ``_compare_files``.  The shared
+    ``compare`` method handles file pairing and diff collection.
+    """
+
+    def compare(self, output_dir: Path, expected_dir: Path) -> tuple[bool, str | None]:
+        try:
+            pairs = get_file_pairs(output_dir, expected_dir)
+        except ValueError as e:
+            return False, str(e)
+
+        diffs: list[str] = []
+        for output_file, expected_file in pairs:
+            passed, diff = self._compare_files(output_file, expected_file)
+            if not passed:
+                diffs.append(f"--- {expected_file.name} vs {output_file.name} ---\n{diff}")
+
+        if diffs:
+            return False, "\n\n".join(diffs)
+        return True, None
+
+    @abc.abstractmethod
+    def _compare_files(self, output_file: Path, expected_file: Path) -> tuple[bool, str]:
+        """Compare a single pair of files. Return (passed, diff_text)."""
         ...
 
 

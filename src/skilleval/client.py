@@ -11,6 +11,7 @@ import time
 import aiohttp
 
 from skilleval.models import ChatResponse, ModelEntry, TaskConfig
+from skilleval.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +32,14 @@ class TimeoutError(Exception):  # noqa: A001
     """Request timed out."""
 
 
-_MAX_RETRIES = 3
-_BACKOFF_BASE = [1, 2, 4]
-
-
 class ModelClient:
     """Async client for OpenAI-compatible chat completion endpoints."""
 
     def __init__(self) -> None:
         self._session: aiohttp.ClientSession | None = None
+        settings = get_settings()
+        self._max_retries = settings.max_retries
+        self._backoff_base = settings.backoff_base
 
     async def __aenter__(self) -> ModelClient:
         self._session = aiohttp.ClientSession()
@@ -84,7 +84,7 @@ class ModelClient:
 
         last_error: Exception | None = None
 
-        for attempt in range(_MAX_RETRIES):
+        for attempt in range(self._max_retries):
             t0 = time.monotonic()
             try:
                 async with self._session.post(
@@ -96,7 +96,7 @@ class ModelClient:
                         last_error = RateLimitError(f"Rate limited by {model.provider}")
                         logger.warning(
                             "Rate limit (429) from %s, attempt %d/%d",
-                            model.provider, attempt + 1, _MAX_RETRIES,
+                            model.provider, attempt + 1, self._max_retries,
                         )
                         retry_after = resp.headers.get("Retry-After")
                         if retry_after:
@@ -115,7 +115,7 @@ class ModelClient:
                         last_error = ApiError(resp.status, text)
                         logger.warning(
                             "Server error %d from %s, attempt %d/%d",
-                            resp.status, model.name, attempt + 1, _MAX_RETRIES,
+                            resp.status, model.name, attempt + 1, self._max_retries,
                         )
                         await self._backoff(attempt)
                         continue
@@ -139,7 +139,7 @@ class ModelClient:
                         )
                         logger.warning(
                             "Empty response from %s (silent rate-limit), attempt %d/%d",
-                            model.provider, attempt + 1, _MAX_RETRIES,
+                            model.provider, attempt + 1, self._max_retries,
                         )
                         await self._backoff(attempt)
                         continue
@@ -158,7 +158,7 @@ class ModelClient:
                 )
                 logger.warning(
                     "Timeout for %s after %.1fs, attempt %d/%d",
-                    model.name, latency, attempt + 1, _MAX_RETRIES,
+                    model.name, latency, attempt + 1, self._max_retries,
                 )
                 await self._backoff(attempt)
             except (ApiError, RateLimitError, TimeoutError):
@@ -168,7 +168,7 @@ class ModelClient:
                 last_error = ApiError(0, f"Connection error: {e}")
                 logger.warning(
                     "Connection error for %s: %s, attempt %d/%d",
-                    model.name, e, attempt + 1, _MAX_RETRIES,
+                    model.name, e, attempt + 1, self._max_retries,
                 )
                 await self._backoff(attempt)
 
@@ -217,12 +217,11 @@ class ModelClient:
             finish_reason=finish_reason,
         )
 
-    @staticmethod
-    async def _backoff(attempt: int) -> None:
+    async def _backoff(self, attempt: int) -> None:
         """Exponential backoff with jitter."""
         import asyncio
 
-        base = _BACKOFF_BASE[min(attempt, len(_BACKOFF_BASE) - 1)]
+        base = self._backoff_base[min(attempt, len(self._backoff_base) - 1)]
         jitter = random.uniform(0, base * 0.5)
         duration = base + jitter
         logger.warning("Backing off %.1fs before retry (attempt %d)", duration, attempt + 1)

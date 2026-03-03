@@ -11,13 +11,17 @@ from skilleval.comparators.custom import CustomComparator
 from skilleval.comparators.field_subset import FieldSubsetComparator
 from skilleval.comparators.file_hash import FileHashComparator
 from skilleval.comparators.json_exact import JsonExactComparator
+from skilleval.comparators.text_contains import TextContainsComparator
+from skilleval.comparators.text_exact import TextExactComparator
 
-COMPARATORS: dict[str, type] = {
+COMPARATORS: dict[str, type[Comparator]] = {
     "json_exact": JsonExactComparator,
     "csv_unordered": CsvUnorderedComparator,
     "csv_ordered": CsvOrderedComparator,
     "field_subset": FieldSubsetComparator,
     "file_hash": FileHashComparator,
+    "text_exact": TextExactComparator,
+    "text_contains": TextContainsComparator,
     "custom": CustomComparator,
 }
 
@@ -30,24 +34,14 @@ __all__ = [
     "CsvOrderedComparator",
     "FieldSubsetComparator",
     "FileHashComparator",
+    "TextExactComparator",
+    "TextContainsComparator",
     "CustomComparator",
 ]
 
 
 def get_comparator(name: str, **kwargs: Any) -> Comparator:
-    """Create a comparator instance by name.
-
-    Args:
-        name: Comparator name (must be a key in COMPARATORS).
-        **kwargs: Extra arguments passed to the comparator constructor
-                  (e.g. custom_script for CustomComparator).
-
-    Returns:
-        A Comparator instance.
-
-    Raises:
-        ValueError: If the comparator name is unknown.
-    """
+    """Create a comparator instance by name."""
     cls = COMPARATORS.get(name)
     if cls is None:
         available = ", ".join(sorted(COMPARATORS))

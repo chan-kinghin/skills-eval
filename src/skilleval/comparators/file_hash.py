@@ -5,31 +5,15 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from skilleval.comparators.base import get_file_pairs
+from skilleval.comparators.base import FileComparator
 
 
-class FileHashComparator:
+class FileHashComparator(FileComparator):
     """Byte-identical comparison via SHA-256.
 
     CRLF vs LF matters -- this is a raw byte comparison.
     No markdown fence stripping (hash comparison is intentionally strict).
     """
-
-    def compare(self, output_dir: Path, expected_dir: Path) -> tuple[bool, str | None]:
-        try:
-            pairs = get_file_pairs(output_dir, expected_dir)
-        except ValueError as e:
-            return False, str(e)
-
-        diffs: list[str] = []
-        for output_file, expected_file in pairs:
-            passed, diff = self._compare_files(output_file, expected_file)
-            if not passed:
-                diffs.append(diff)
-
-        if diffs:
-            return False, "\n\n".join(diffs)
-        return True, None
 
     def _compare_files(self, output_file: Path, expected_file: Path) -> tuple[bool, str]:
         try:
