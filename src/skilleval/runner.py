@@ -13,6 +13,7 @@ from skilleval.comparators.base import strip_markdown_fences, strip_reasoning_ta
 from skilleval.display import console, create_progress, display_results_path
 from skilleval.documents import format_input_files, input_descriptions
 from skilleval.engine import ExecutionEngine, TrialSpec
+from skilleval.i18n import t
 from skilleval.models import (
     ChainCell,
     MatrixCell,
@@ -111,12 +112,14 @@ def _compute_recommendation(
 async def _execute_with_progress(
     engine: ExecutionEngine,
     specs: list[TrialSpec],
-    label: str = "Running trials...",
+    label: str | None = None,
 ) -> tuple[list[TrialResult], bool]:
     """Execute specs with a Rich progress bar, handling interrupts.
 
     Returns ``(results, interrupted)``.
     """
+    if label is None:
+        label = t("runner.running_trials")
     interrupted = False
     results: list[TrialResult] = []
     try:
@@ -233,7 +236,7 @@ async def run_mode1(
 
     summary = RunSummary(
         mode="run",
-        task_path=str(task.path),
+        task_path=task.path.name,
         timestamp=datetime.now().isoformat(),
         model_results=model_results,
         recommendation=recommendation,
@@ -268,7 +271,7 @@ async def run_mode2(
     comparator_kwargs = _build_comparator_kwargs(task)
 
     # Phase 1: Skill Generation
-    console.print("[bold]Phase 1:[/bold] Generating skills...")
+    console.print(f"[bold]{t('runner.phase1_generating')}[/bold]")
     creator_specs: list[TrialSpec] = []
     for creator in creators:
         creator_specs.append(
@@ -293,7 +296,7 @@ async def run_mode2(
     skill_results, interrupted = await _execute_with_progress(
         engine,
         creator_specs,
-        "Generating skills...",
+        t("runner.phase1_generating"),
     )
 
     generated_skills: dict[str, str] = {}
@@ -303,7 +306,9 @@ async def run_mode2(
             continue
         result = skill_results[i]
         if result.error:
-            console.print(f"[red]Skill generation failed for {creator.name}: {result.error}[/red]")
+            console.print(
+                f"[red]{t('display.messages.skill_gen_failed', name=creator.name, error=result.error)}[/red]"
+            )
             generated_skills[creator.name] = ""
         else:
             generated_skills[creator.name] = result.output_text
@@ -315,7 +320,7 @@ async def run_mode2(
     exec_results: list[TrialResult] = []
 
     if not interrupted:
-        console.print("[bold]Phase 2:[/bold] Executing trials...")
+        console.print(f"[bold]{t('runner.phase2_executing')}[/bold]")
         for creator in creators:
             skill_text = generated_skills[creator.name]
             if not skill_text:
@@ -401,7 +406,7 @@ async def run_mode2(
 
     summary = RunSummary(
         mode="matrix",
-        task_path=str(task.path),
+        task_path=task.path.name,
         timestamp=datetime.now().isoformat(),
         matrix_results=matrix_results,
         recommendation=recommendation,
@@ -445,7 +450,7 @@ async def run_mode3(
 
     # Phase 1: Skill Generation
     interrupted = False
-    console.print("[bold]Phase 1:[/bold] Generating skills with meta-skills...")
+    console.print(f"[bold]{t('runner.phase1_generating_meta')}[/bold]")
     gen_specs: list[TrialSpec] = []
     gen_keys: list[tuple[str, str]] = []
 
@@ -476,7 +481,7 @@ async def run_mode3(
     gen_results, interrupted = await _execute_with_progress(
         engine,
         gen_specs,
-        "Generating skills...",
+        t("runner.phase1_generating"),
     )
 
     generated_skills: dict[tuple[str, str], str] = {}
@@ -487,7 +492,7 @@ async def run_mode3(
         result = gen_results[i]
         if result.error:
             console.print(
-                f"[red]Skill generation failed for {ms_name}/{cr_name}: {result.error}[/red]"
+                f"[red]{t('display.messages.skill_gen_failed', name=f'{ms_name}/{cr_name}', error=result.error)}[/red]"
             )
             generated_skills[(ms_name, cr_name)] = ""
         else:
@@ -500,7 +505,7 @@ async def run_mode3(
     exec_results: list[TrialResult] = []
 
     if not interrupted:
-        console.print("[bold]Phase 2:[/bold] Executing trials...")
+        console.print(f"[bold]{t('runner.phase2_executing')}[/bold]")
         for ms_name in meta_skill_names:
             for creator in creators:
                 skill_text = generated_skills.get((ms_name, creator.name), "")
@@ -591,7 +596,7 @@ async def run_mode3(
 
     summary = RunSummary(
         mode="chain",
-        task_path=str(task.path),
+        task_path=task.path.name,
         timestamp=datetime.now().isoformat(),
         chain_results=chain_results,
         recommendation=recommendation,

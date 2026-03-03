@@ -25,12 +25,14 @@ from skilleval.display import (
     display_catalog,
     display_chain_results,
     display_comparison,
+    display_history,
     display_lint_report,
     display_matrix_results,
     display_pre_run_estimate,
     display_run_results,
     display_skill_test_results,
 )
+from skilleval.i18n import t
 from skilleval.models import ModelEntry, ModelResult, RunSummary
 
 
@@ -38,9 +40,11 @@ def _no_models_error(catalog: list[ModelEntry]) -> click.ClickException:
     """Build an actionable error when no models have API keys configured."""
     env_keys = sorted({m.env_key for m in catalog if m.env_key != "_ADHOC_"})
     hint = (
-        "No models available. Set one of these env vars to get started:\n"
+        t("cli.errors.no_models")
+        + "\n"
         + "\n".join(f"  export {k}=<your-key>" for k in env_keys)
-        + "\n\nOr use --endpoint for a custom OpenAI-compatible API."
+        + "\n\n"
+        + t("cli.errors.or_endpoint")
     )
     return click.ClickException(hint)
 
@@ -54,16 +58,11 @@ def _inject_adhoc(
     api_key: str | None,
     model_name: str | None,
 ) -> None:
-    """Append an ad-hoc model to *catalog* when ``--endpoint`` is provided.
-
-    Mutates *catalog* in place so the model is discoverable by
-    ``filter_available`` (picks it up via its embedded ``api_key``) and
-    ``filter_by_names`` (user references it by ``--model-name``).
-    """
+    """Append an ad-hoc model to *catalog* when ``--endpoint`` is provided."""
     if not endpoint:
         return
     if not model_name:
-        raise click.ClickException("--endpoint requires --model-name.")
+        raise click.ClickException(t("cli.errors.endpoint_requires_model"))
     catalog.append(build_adhoc_model(endpoint, api_key or "", model_name))
 
 
@@ -133,11 +132,7 @@ def _write_chain_csv(cells: list) -> str:
 
 
 def _configure_logging(verbosity: int) -> None:
-    """Configure the logging level and format based on CLI verbosity.
-
-    Logging output goes to stderr so it does not interfere with Rich console
-    output on stdout.
-    """
+    """Configure the logging level and format based on CLI verbosity."""
     if verbosity == 0:
         level = logging.WARNING
     elif verbosity == 1:
@@ -155,8 +150,6 @@ def _configure_logging(verbosity: int) -> None:
 
     root_logger = logging.getLogger("skilleval")
     root_logger.setLevel(level)
-    # Avoid duplicate handlers if the CLI group is invoked more than once
-    # (e.g. in tests using CliRunner).
     if not root_logger.handlers:
         root_logger.addHandler(handler)
     else:
@@ -175,19 +168,20 @@ class _SkillEvalGroup(click.Group):
         except click.ClickException:
             raise
         except KeyboardInterrupt:
-            console.print("\n[yellow]Interrupted.[/yellow]")
+            console.print(f"\n[yellow]{t('display.messages.interrupted')}[/yellow]")
             ctx.exit(130)
         except Exception as e:
-            # Show friendly error; use -vv to see traceback
             verbosity = ctx.obj.get("verbosity", 0) if ctx.obj else 0
             if verbosity >= 2:
                 raise
-            console.print(f"\n[red]Error:[/red] {type(e).__name__}: {e}")
-            console.print("[dim]Use -vv for full traceback.[/dim]")
+            console.print(
+                f"\n[red]{t('display.messages.error_prefix')}[/red] {type(e).__name__}: {e}"
+            )
+            console.print(f"[dim]{t('display.messages.use_vv')}[/dim]")
             ctx.exit(1)
 
 
-@click.group(cls=_SkillEvalGroup)
+@click.group(cls=_SkillEvalGroup, invoke_without_command=True)
 @click.version_option(package_name="skilleval")
 @click.option(
     "-v",
@@ -202,57 +196,78 @@ def cli(ctx: click.Context, verbose: int) -> None:
     ctx.obj["verbosity"] = verbose
     _configure_logging(verbose)
 
+    # If no subcommand is given, launch the interactive TUI
+    if ctx.invoked_subcommand is None:
+        from skilleval.tui import interactive_session
+
+        interactive_session(ctx)
+
 
 @cli.command()
 @click.argument("name")
 def init(name: str) -> None:
-    """Create a new task folder with template files."""
+    """Create a new task folder with template files.
+
+    \b
+    Creates the following structure:
+        <name>/
+            config.yaml      # comparator, trials, model params
+            skill.md          # system prompt for Mode 1
+            prompt.md         # task description for Mode 2/3
+            meta-skill.md     # meta-skill for Mode 3
+            input/            # input files the model receives
+            expected/         # expected output for comparison
+    """
     task_path = Path(name)
     if task_path.exists():
-        raise click.ClickException(f"Directory '{name}' already exists")
+        raise click.ClickException(t("cli.init.dir_exists", name=name))
 
     task_path.mkdir(parents=True)
     (task_path / "input").mkdir()
     (task_path / "expected").mkdir()
 
-    (task_path / "input" / "sample.txt").write_text(
+    (task_path / "input" / "example.txt").write_text(
         "Replace this file with your actual input data.\n"
+        "You can have multiple input files — they will all be sent to the model.\n"
     )
-    (task_path / "expected" / "sample.txt").write_text(
-        "Replace this file with the expected output for sample.txt.\n"
+    (task_path / "expected" / "example.txt").write_text(
+        "Replace this file with the expected output.\n"
+        "File names must match between input/ and expected/ directories.\n"
     )
 
     (task_path / "prompt.md").write_text(
         "# Task Description\n\n"
         "Describe what the model should do with the input files.\n"
-        "This is used in Mode 2/3 for skill generation.\n"
+        "Used in Mode 2 (matrix) and Mode 3 (chain) for skill generation.\n"
     )
 
     (task_path / "skill.md").write_text(
         "# Task Skill\n\n"
-        "Write the system prompt / skill that tells the model\n"
+        "Write the system prompt that tells the model\n"
         "exactly how to transform the input into the expected output.\n"
-        "This is used in Mode 1 (direct evaluation).\n"
+        "Used in Mode 1: `skilleval run " + name + "`\n"
     )
 
     (task_path / "meta-skill.md").write_text(
         "# Meta-Skill\n\n"
         "Write instructions for how a model should write a task skill.\n"
-        "This is used in Mode 3 (meta-skill chain evaluation).\n"
-        "Rename this file to meta-skill-<variant>.md for multiple variants.\n"
+        "Used in Mode 3: `skilleval chain " + name + " --meta-skills default ...`\n"
+        "\n"
+        "Tip: Rename to meta-skill-<variant>.md for multiple variants.\n"
     )
 
     (task_path / "config.yaml").write_text(
         "# SkillEval task configuration\n"
         "\n"
         "# Comparator: how to check if output matches expected\n"
-        "# Options: json_exact, csv_ordered, csv_unordered, field_subset, file_hash, custom\n"
+        "# Options: json_exact, csv_ordered, csv_unordered, field_subset,\n"
+        "#          text_exact, text_contains, file_hash, custom\n"
         "comparator: json_exact\n"
         "\n"
         "# For custom comparator, path to the script:\n"
         "# custom_script: ./compare.py\n"
         "\n"
-        "# Number of trials per model (higher = more confidence)\n"
+        "# Number of trials per model (higher = more confidence, 10+ recommended)\n"
         "trials: 5\n"
         "\n"
         "# API timeout in seconds\n"
@@ -266,20 +281,22 @@ def init(name: str) -> None:
         "output_format: json\n"
     )
 
-    console.print(f"\n[bold green]Created task folder:[/bold green] {task_path}")
+    console.print(f"\n[bold green]{t('cli.init.created')}[/bold green] {task_path}/")
     console.print()
-    console.print("[bold]Next steps:[/bold]")
-    console.print(f"  1. Add input files to [cyan]{task_path}/input/[/cyan]")
-    console.print(f"  2. Add expected output files to [cyan]{task_path}/expected/[/cyan]")
-    console.print(f"  3. Write your skill in [cyan]{task_path}/skill.md[/cyan]")
-    console.print(f"  4. Edit [cyan]{task_path}/config.yaml[/cyan] as needed")
-    console.print(f"  5. Run: [bold]skilleval run {task_path}[/bold]")
+    console.print(f"  [dim]config.yaml[/dim]      {t('cli.init.config_desc')}")
+    console.print(f"  [dim]skill.md[/dim]          {t('cli.init.skill_desc')}")
+    console.print(f"  [dim]prompt.md[/dim]         {t('cli.init.prompt_desc')}")
+    console.print(f"  [dim]meta-skill.md[/dim]     {t('cli.init.meta_skill_desc')}")
+    console.print(f"  [dim]input/[/dim]            {t('cli.init.input_desc')}")
+    console.print(f"  [dim]expected/[/dim]         {t('cli.init.expected_desc')}")
     console.print()
-    console.print(
-        "[dim]Available comparators: json_exact, csv_ordered, csv_unordered, "
-        "field_subset, file_hash, custom[/dim]"
-    )
-    console.print("[dim]Check available models: skilleval catalog[/dim]")
+    console.print(f"[bold]{t('cli.init.next_steps')}[/bold]")
+    console.print(f"  {t('cli.init.step1', path=task_path)}")
+    console.print(f"  {t('cli.init.step2', path=task_path)}")
+    console.print(f"  {t('cli.init.step3', path=task_path)}")
+    console.print(f"  {t('cli.init.step4', path=task_path)}")
+    console.print()
+    console.print(f"[dim]{t('cli.init.see_models')}[/dim]")
 
 
 # ── Mode 1: Skill Evaluation ────────────────────────────────────────────
@@ -331,16 +348,15 @@ def run(
                 completed_models = set(checkpoint.get("completed_models", []))
                 if fmt == "rich":
                     console.print(
-                        f"[bold]Resuming:[/bold] skipping {len(completed_models)} "
-                        f"completed model(s): {', '.join(sorted(completed_models))}"
+                        f"[bold]{t('cli.run.resuming', count=len(completed_models), models=', '.join(sorted(completed_models)))}[/bold]"
                     )
             else:
                 if fmt == "rich":
-                    console.print("[yellow]No checkpoint found, starting fresh.[/yellow]")
+                    console.print(f"[yellow]{t('cli.run.no_checkpoint')}[/yellow]")
 
         task = load_task(task_path)
         if not task.skill:
-            raise click.ClickException("Mode 1 requires skill.md in the task folder")
+            raise click.ClickException(t("cli.run.requires_skill"))
 
         if trials is not None:
             task.config.trials = trials
@@ -361,7 +377,7 @@ def run(
             selected = [m for m in selected if m.name not in completed_models]
             if not selected:
                 if fmt == "rich":
-                    console.print("[bold green]All models already completed.[/bold green]")
+                    console.print(f"[bold green]{t('cli.run.all_completed')}[/bold green]")
                 return
 
         num_calls = len(selected) * task.config.trials
@@ -372,10 +388,10 @@ def run(
         )
 
         if fmt == "rich":
-            console.print("[bold]Mode 1: Skill Evaluation[/bold]")
-            console.print(f"Task: {task.path}")
-            console.print(f"Models: {', '.join(m.name for m in selected)}")
-            console.print(f"Trials: {task.config.trials}")
+            console.print(f"[bold]{t('cli.run.title')}[/bold]")
+            console.print(f"{t('cli.run.task_label')} {task.path}")
+            console.print(f"{t('cli.run.models_label')} {', '.join(m.name for m in selected)}")
+            console.print(f"{t('cli.run.trials_label')} {task.config.trials}")
             display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode1(task, selected, parallel))
@@ -439,7 +455,7 @@ def matrix(
 
         task = load_task(task_path)
         if not task.prompt:
-            raise click.ClickException("Mode 2 requires prompt.md in the task folder")
+            raise click.ClickException(t("cli.matrix.requires_prompt"))
 
         if trials is not None:
             task.config.trials = trials
@@ -461,10 +477,14 @@ def matrix(
         )
 
         if fmt == "rich":
-            console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
-            console.print(f"Task: {task.path}")
-            console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
-            console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
+            console.print(f"[bold]{t('cli.matrix.title')}[/bold]")
+            console.print(f"{t('cli.run.task_label')} {task.path}")
+            console.print(
+                f"{t('cli.matrix.creators_label')} {', '.join(m.name for m in creator_models)}"
+            )
+            console.print(
+                f"{t('cli.matrix.executors_label')} {', '.join(m.name for m in executor_models)}"
+            )
             display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode2(task, creator_models, executor_models, parallel))
@@ -477,7 +497,7 @@ def matrix(
             display_matrix_results(summary.matrix_results)
             if summary.recommendation:
                 console.print(
-                    f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}"
+                    f"\n[bold green]{t('display.messages.recommendation')}[/bold green] {summary.recommendation}"
                 )
 
     except (ValueError, FileNotFoundError) as e:
@@ -537,7 +557,7 @@ def chain(
 
         task = load_task(task_path)
         if not task.prompt:
-            raise click.ClickException("Mode 3 requires prompt.md in the task folder")
+            raise click.ClickException(t("cli.chain.requires_prompt"))
 
         if trials is not None:
             task.config.trials = trials
@@ -556,7 +576,7 @@ def chain(
                     ", ".join(sorted(task.meta_skills.keys())) if task.meta_skills else "none"
                 )
                 raise click.ClickException(
-                    f"Meta-skill '{ms_name}' not found. Available: {available}"
+                    t("cli.errors.meta_skill_not_found", name=ms_name, available=available)
                 )
 
         # Estimate API calls
@@ -573,16 +593,20 @@ def chain(
         )
 
         if fmt == "rich":
-            console.print("[bold]Mode 3: Chain Evaluation[/bold]")
-            console.print(f"Task: {task.path}")
-            console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
-            console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
-            console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
+            console.print(f"[bold]{t('cli.chain.title')}[/bold]")
+            console.print(f"{t('cli.run.task_label')} {task.path}")
+            console.print(f"{t('cli.chain.meta_skills_label')} {', '.join(meta_skill_names)}")
+            console.print(
+                f"{t('cli.matrix.creators_label')} {', '.join(m.name for m in creator_models)}"
+            )
+            console.print(
+                f"{t('cli.matrix.executors_label')} {', '.join(m.name for m in executor_models)}"
+            )
             display_pre_run_estimate(total_calls, estimated_cost)
 
         if total_calls > 100 and not yes:
-            if not click.confirm("Proceed with this run?"):
-                click.echo("Aborted.")
+            if not click.confirm(t("cli.chain.proceed_confirm")):
+                click.echo(t("cli.chain.aborted"))
                 return
 
         summary = asyncio.run(
@@ -597,7 +621,7 @@ def chain(
             display_chain_results(summary.chain_results)
             if summary.recommendation:
                 console.print(
-                    f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}"
+                    f"\n[bold green]{t('display.messages.recommendation')}[/bold green] {summary.recommendation}"
                 )
 
     except (ValueError, FileNotFoundError) as e:
@@ -658,10 +682,28 @@ def report(results_path: str, html_path: str | None, open_browser: bool, json_ou
     """Re-render results from a previous run."""
     try:
         path = Path(results_path)
+
+        # Support "skilleval report ./my-task" → resolve .skilleval/latest
+        if path.is_dir() and not (path / "results.json").exists():
+            latest = path / ".skilleval" / "latest"
+            if latest.is_symlink() or latest.is_dir():
+                path = latest.resolve()
+            elif (path / ".skilleval").is_dir():
+                runs = sorted(
+                    (d for d in (path / ".skilleval").iterdir() if d.name.startswith("run-")),
+                    reverse=True,
+                )
+                if runs:
+                    path = runs[0]
+                else:
+                    raise click.ClickException(t("cli.report.no_runs_in", path=path / ".skilleval"))
+            else:
+                raise click.ClickException(t("cli.report.no_results", path=path))
+
         results_file = path / "results.json" if path.is_dir() else path
 
         if not results_file.exists():
-            raise click.ClickException(f"Results file not found: {results_file}")
+            raise click.ClickException(t("cli.report.not_found", path=results_file))
 
         data = json.loads(results_file.read_text())
         summary = RunSummary(**data)
@@ -674,7 +716,7 @@ def report(results_path: str, html_path: str | None, open_browser: bool, json_ou
             from skilleval.html_report import generate_html_report
 
             out = generate_html_report(summary, Path(html_path))
-            click.echo(f"HTML report written to: {out}")
+            click.echo(t("cli.report.html_written", path=out))
             if open_browser:
                 webbrowser.open(out.resolve().as_uri())
             return
@@ -686,10 +728,12 @@ def report(results_path: str, html_path: str | None, open_browser: bool, json_ou
         elif summary.mode == "chain":
             display_chain_results(summary.chain_results)
         else:
-            click.echo(f"Unknown mode: {summary.mode}")
+            click.echo(t("cli.report.unknown_mode", mode=summary.mode))
 
         if summary.recommendation:
-            console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
+            console.print(
+                f"\n[bold green]{t('display.messages.recommendation')}[/bold green] {summary.recommendation}"
+            )
 
     except (ValueError, json.JSONDecodeError) as e:
         raise click.ClickException(str(e))
@@ -725,6 +769,32 @@ def compare(old_run: str, new_run: str) -> None:
         raise click.ClickException(str(e))
 
 
+@cli.command()
+@click.argument("task_path")
+@click.option("--json", "json_output", is_flag=True, help="Output history as JSON")
+def history(task_path: str, json_output: bool) -> None:
+    """List past evaluation runs for a task."""
+    try:
+        from skilleval.results import load_run_history
+
+        runs = load_run_history(Path(task_path))
+        if not runs:
+            console.print(f"[yellow]{t('cli.history.no_runs', path=task_path)}[/yellow]")
+            console.print(f"[dim]{t('cli.history.create_hint', path=task_path)}[/dim]")
+            return
+
+        if json_output:
+            out = []
+            for r in runs:
+                entry = {k: v for k, v in r.items() if k != "path"}
+                out.append(entry)
+            click.echo(json.dumps(out, indent=2))
+        else:
+            display_history(runs, task_path)
+    except (ValueError, FileNotFoundError) as e:
+        raise click.ClickException(str(e))
+
+
 @cli.command("skill-test")
 @click.argument("skill_path")
 @click.option("--test-cases", required=True, help="Path to test case directory")
@@ -753,7 +823,7 @@ def skill_test(
         skill_prompt = parse_skill(Path(skill_path))
         cases = load_test_cases(Path(test_cases))
         if not cases:
-            raise click.ClickException("No valid test cases found in the specified directory")
+            raise click.ClickException(t("cli.skill_test.no_cases"))
 
         catalog = load_catalog(catalog_path)
         _inject_adhoc(catalog, endpoint, api_key, model_name)
@@ -771,10 +841,12 @@ def skill_test(
                 case.config.trials = trials
             case.skill = skill_prompt.core_prompt
 
-        console.print("[bold]Skill Test[/bold]")
-        console.print(f"Skill: {skill_prompt.name or skill_prompt.source_path}")
-        console.print(f"Models: {', '.join(m.name for m in selected)}")
-        console.print(f"Test cases: {len(cases)}")
+        console.print(f"[bold]{t('cli.skill_test.title')}[/bold]")
+        console.print(
+            f"{t('cli.skill_test.skill_label')} {skill_prompt.name or skill_prompt.source_path}"
+        )
+        console.print(f"{t('cli.run.models_label')} {', '.join(m.name for m in selected)}")
+        console.print(f"{t('cli.skill_test.test_cases_label')} {len(cases)}")
 
         summaries = asyncio.run(_run_skill_test(cases, selected, parallel))
 

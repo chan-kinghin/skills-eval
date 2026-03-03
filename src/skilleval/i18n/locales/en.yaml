@@ -1,0 +1,176 @@
+# SkillEval English locale
+# Keys are referenced via t("section.subsection.key")
+
+display:
+  tables:
+    evaluation_results: "Evaluation Results"
+    model: "Model"
+    pass_rate: "Pass Rate"
+    avg_cost: "Avg Cost"
+    avg_latency: "Avg Latency"
+    total_cost: "Total Cost"
+    rec: "Rec"
+    provider: "Provider"
+    input_cost: "Input $/M"
+    output_cost: "Output $/M"
+    context: "Context"
+    env_var: "Env Var"
+    status: "Status"
+    ready: "Ready"
+    no_key: "No Key"
+    model_catalog: "Model Catalog"
+    creator_executor_matrix: "Creator x Executor Matrix (Pass Rate %)"
+    creator_executor: "Creator \\ Executor"
+    meta_skill_comparison: "Meta-Skill Comparison"
+    meta_skill: "Meta-Skill"
+    avg_pass_rate: "Avg Pass Rate"
+    run_history: "Run History"
+    run: "Run"
+    mode: "Mode"
+    models: "Models"
+    recommendation: "Recommendation"
+    skill_lint_report: "Skill Lint Report"
+    severity: "Severity"
+    line: "Line"
+    message: "Message"
+    run_comparison: "Run Comparison"
+    old_rate: "Old Rate"
+    new_rate: "New Rate"
+    delta: "Delta"
+    skill_test: "Skill Test"
+    test_case: "Test Case"
+    cases_passing: "Cases Passing"
+    overall_summary: "Overall Summary per Model"
+    latest: "(latest)"
+
+  messages:
+    recommendation: "Recommendation:"
+    no_perfect: "No model achieved 100% pass rate. Best: {model} at {rate}."
+    consider_improving: "Consider improving the skill or increasing trials."
+    no_matrix_results: "No matrix results to display."
+    best_pair: "Best pair:"
+    cheapest_perfect: "Cheapest @ 100%:"
+    no_chain_results: "No chain results to display."
+    best_chain: "Best chain:"
+    tip_env_vars: "Tip: Set these env vars to unlock more models: {keys}"
+    estimated: "Estimated:"
+    estimated_detail: "{num_calls} API calls, ~${cost:.2f} total cost"
+    results_saved: "Results saved to:"
+    view_again: "View again:  skilleval report {task_path}"
+    html_report_hint: "HTML report: skilleval report {task_path} --html report.html --open"
+    run_history_hint: "Run history: skilleval history {task_path}"
+    view_run: "View a run: skilleval report {task_path}/.skilleval/<run-dir>"
+    no_issues: "No issues found!"
+    quality_score: "Quality Score:"
+    summary: "Summary:"
+    interrupted: "Interrupted."
+    error_prefix: "Error:"
+    use_vv: "Use -vv for full traceback."
+    skill_gen_failed: "Skill generation failed for {name}: {error}"
+
+runner:
+  phase1_generating: "Phase 1: Generating skills..."
+  phase1_generating_meta: "Phase 1: Generating skills with meta-skills..."
+  phase2_executing: "Phase 2: Executing trials..."
+  running_trials: "Running trials..."
+
+cli:
+  run:
+    title: "Mode 1: Skill Evaluation"
+    task_label: "Task:"
+    models_label: "Models:"
+    trials_label: "Trials:"
+    requires_skill: "Mode 1 requires skill.md in the task folder"
+    resuming: "Resuming: skipping {count} completed model(s): {models}"
+    no_checkpoint: "No checkpoint found, starting fresh."
+    all_completed: "All models already completed."
+
+  matrix:
+    title: "Mode 2: Matrix Evaluation"
+    creators_label: "Creators:"
+    executors_label: "Executors:"
+    requires_prompt: "Mode 2 requires prompt.md in the task folder"
+
+  chain:
+    title: "Mode 3: Chain Evaluation"
+    meta_skills_label: "Meta-skills:"
+    requires_prompt: "Mode 3 requires prompt.md in the task folder"
+    proceed_confirm: "Proceed with this run?"
+    aborted: "Aborted."
+
+  init:
+    created: "Created task:"
+    config_desc: "Comparator, trials, model params"
+    skill_desc: "System prompt (Mode 1)"
+    prompt_desc: "Task description (Mode 2/3)"
+    meta_skill_desc: "Meta-skill template (Mode 3)"
+    input_desc: "Input files for the model"
+    expected_desc: "Expected output for comparison"
+    next_steps: "Next steps:"
+    step1: "1. Add your input files to {path}/input/"
+    step2: "2. Add expected output to {path}/expected/"
+    step3: "3. Write your skill in {path}/skill.md"
+    step4: "4. Run: skilleval run {path}"
+    see_models: "See available models: skilleval catalog"
+    dir_exists: "Directory '{name}' already exists"
+
+  history:
+    no_runs: "No runs found in {path}/.skilleval/"
+    create_hint: "Run 'skilleval run {path}' to create one."
+
+  report:
+    no_results: "No results.json in {path}. Run 'skilleval run {path}' first."
+    no_runs_in: "No runs found in {path}"
+    not_found: "Results file not found: {path}"
+    html_written: "HTML report written to: {path}"
+    unknown_mode: "Unknown mode: {mode}"
+
+  skill_test:
+    title: "Skill Test"
+    skill_label: "Skill:"
+    test_cases_label: "Test cases:"
+    no_cases: "No valid test cases found in the specified directory"
+
+  errors:
+    no_models: "No models available. Set one of these env vars to get started:"
+    or_endpoint: "Or use --endpoint for a custom OpenAI-compatible API."
+    endpoint_requires_model: "--endpoint requires --model-name."
+    meta_skill_not_found: "Meta-skill '{name}' not found. Available: {available}"
+
+tui:
+  welcome: "SkillEval Interactive Mode"
+  prompt: "skilleval> "
+  type_help: "Type /help for commands, /quit to exit."
+  unknown_command: "Unknown command: /{command}. Type /help for available commands."
+  goodbye: "Goodbye!"
+
+  commands:
+    run: "Evaluate models with a given skill"
+    matrix: "Creator x executor matrix evaluation"
+    chain: "Meta-skill chain evaluation"
+    catalog: "Show model catalog"
+    language: "Switch language (EN/ZH)"
+    init: "Create a new task folder"
+    report: "View results from a previous run"
+    history: "List past runs for a task"
+    lint: "Validate a skill structure"
+    compare: "Compare two runs"
+    help: "Show this help"
+    quit: "Exit interactive mode"
+
+  prompts:
+    task_path: "Task path"
+    models: "Models (comma-separated, or Enter for all)"
+    trials: "Trials (or Enter for config default)"
+    creators: "Creator models (comma-separated)"
+    executors: "Executor models (comma-separated)"
+    meta_skills: "Meta-skill names (comma-separated)"
+    skill_path: "Skill file path"
+    results_path: "Results path"
+    old_run: "Old run path"
+    new_run: "New run path"
+    task_name: "Task name"
+
+  language:
+    current: "Current language: {lang}"
+    switched: "Language switched to: {lang}"

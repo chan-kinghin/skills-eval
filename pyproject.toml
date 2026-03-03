@@ -34,6 +34,7 @@ dependencies = [
     "pydantic>=2.0",
     "aiohttp>=3.9",
     "rich>=13.0",
+    "prompt_toolkit>=3.0",
 ]
 
 [project.urls]
@@ -74,6 +75,8 @@ packages = ["src/skilleval"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/skilleval/default_models.yaml" = "skilleval/default_models.yaml"
+"src/skilleval/i18n/locales/en.yaml" = "skilleval/i18n/locales/en.yaml"
+"src/skilleval/i18n/locales/zh.yaml" = "skilleval/i18n/locales/zh.yaml"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

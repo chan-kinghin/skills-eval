@@ -17,6 +17,7 @@ from rich.text import Text
 
 from typing import TYPE_CHECKING
 
+from skilleval.i18n import t
 from skilleval.models import ChainCell, MatrixCell, ModelEntry, ModelResult
 
 if TYPE_CHECKING:
@@ -28,13 +29,13 @@ console = Console()
 
 def display_run_results(results: list[ModelResult], recommendation: str | None) -> None:
     """Display Mode 1 results as a sorted table."""
-    table = Table(title="Evaluation Results", show_lines=True)
-    table.add_column("Model", style="bold")
-    table.add_column("Pass Rate", justify="right")
-    table.add_column("Avg Cost", justify="right")
-    table.add_column("Avg Latency", justify="right")
-    table.add_column("Total Cost", justify="right")
-    table.add_column("Rec", justify="center")
+    table = Table(title=t("display.tables.evaluation_results"), show_lines=True)
+    table.add_column(t("display.tables.model"), style="bold")
+    table.add_column(t("display.tables.pass_rate"), justify="right")
+    table.add_column(t("display.tables.avg_cost"), justify="right")
+    table.add_column(t("display.tables.avg_latency"), justify="right")
+    table.add_column(t("display.tables.total_cost"), justify="right")
+    table.add_column(t("display.tables.rec"), justify="center")
 
     sorted_results = sorted(results, key=lambda r: (-r.pass_rate, r.avg_cost))
 
@@ -64,21 +65,22 @@ def display_run_results(results: list[ModelResult], recommendation: str | None) 
     console.print(table)
 
     if recommendation:
-        console.print(f"\n[bold green]Recommendation:[/bold green] {recommendation}")
+        console.print(
+            f"\n[bold green]{t('display.messages.recommendation')}[/bold green] {recommendation}"
+        )
     else:
         best = max(results, key=lambda r: r.pass_rate) if results else None
         if best:
             console.print(
-                f"\n[yellow]No model achieved 100% pass rate. "
-                f"Best: {best.model} at {best.pass_rate * 100:.0f}%.[/yellow]"
+                f"\n[yellow]{t('display.messages.no_perfect', model=best.model, rate=f'{best.pass_rate * 100:.0f}%')}[/yellow]"
             )
-            console.print("[dim]Consider improving the skill or increasing trials.[/dim]")
+            console.print(f"[dim]{t('display.messages.consider_improving')}[/dim]")
 
 
 def display_matrix_results(cells: list[MatrixCell]) -> None:
     """Display Mode 2 results as a creator x executor heatmap table."""
     if not cells:
-        console.print("[yellow]No matrix results to display.[/yellow]")
+        console.print(f"[yellow]{t('display.messages.no_matrix_results')}[/yellow]")
         return
 
     creators = sorted({c.creator for c in cells})
@@ -88,8 +90,8 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
     for c in cells:
         lookup[(c.creator, c.executor)] = c
 
-    table = Table(title="Creator x Executor Matrix (Pass Rate %)", show_lines=True)
-    table.add_column("Creator \\ Executor", style="bold")
+    table = Table(title=t("display.tables.creator_executor_matrix"), show_lines=True)
+    table.add_column(t("display.tables.creator_executor"), style="bold")
     for ex in executors:
         table.add_column(ex, justify="center")
 
@@ -115,7 +117,7 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
     if cells:
         best_pair = max(cells, key=lambda c: (c.result.pass_rate, -c.result.avg_cost))
         console.print(
-            f"\n[bold]Best pair:[/bold] {best_pair.creator} -> {best_pair.executor} "
+            f"\n[bold]{t('display.messages.best_pair')}[/bold] {best_pair.creator} -> {best_pair.executor} "
             f"({best_pair.result.pass_rate * 100:.0f}%, "
             f"${best_pair.result.avg_cost:.6f}/run)"
         )
@@ -124,7 +126,7 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
         if perfect:
             cheapest = min(perfect, key=lambda c: c.result.avg_cost)
             console.print(
-                f"[bold green]Cheapest @ 100%:[/bold green] "
+                f"[bold green]{t('display.messages.cheapest_perfect')}[/bold green] "
                 f"{cheapest.creator} -> {cheapest.executor} "
                 f"(${cheapest.result.avg_cost:.6f}/run)"
             )
@@ -133,14 +135,14 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
 def display_chain_results(cells: list[ChainCell]) -> None:
     """Display Mode 3 results with meta-skill comparison."""
     if not cells:
-        console.print("[yellow]No chain results to display.[/yellow]")
+        console.print(f"[yellow]{t('display.messages.no_chain_results')}[/yellow]")
         return
 
     # Meta-skill comparison table
     meta_skills = sorted({c.meta_skill_name for c in cells})
-    meta_table = Table(title="Meta-Skill Comparison", show_lines=True)
-    meta_table.add_column("Meta-Skill", style="bold")
-    meta_table.add_column("Avg Pass Rate", justify="right")
+    meta_table = Table(title=t("display.tables.meta_skill_comparison"), show_lines=True)
+    meta_table.add_column(t("display.tables.meta_skill"), style="bold")
+    meta_table.add_column(t("display.tables.avg_pass_rate"), justify="right")
 
     for ms in meta_skills:
         ms_cells = [c for c in cells if c.meta_skill_name == ms]
@@ -154,7 +156,7 @@ def display_chain_results(cells: list[ChainCell]) -> None:
     # Best chain
     best = max(cells, key=lambda c: (c.result.pass_rate, -c.result.avg_cost))
     console.print(
-        f"\n[bold]Best chain:[/bold] {best.meta_skill_name} / {best.creator} -> "
+        f"\n[bold]{t('display.messages.best_chain')}[/bold] {best.meta_skill_name} / {best.creator} -> "
         f"{best.executor} ({best.result.pass_rate * 100:.0f}%, "
         f"${best.result.avg_cost:.6f}/run)"
     )
@@ -163,7 +165,7 @@ def display_chain_results(cells: list[ChainCell]) -> None:
     if perfect:
         cheapest = min(perfect, key=lambda c: c.result.avg_cost)
         console.print(
-            f"[bold green]Cheapest @ 100%:[/bold green] "
+            f"[bold green]{t('display.messages.cheapest_perfect')}[/bold green] "
             f"{cheapest.meta_skill_name} / {cheapest.creator} -> {cheapest.executor} "
             f"(${cheapest.result.avg_cost:.6f}/run)"
         )
@@ -171,21 +173,21 @@ def display_chain_results(cells: list[ChainCell]) -> None:
 
 def display_catalog(models: list[ModelEntry], available: list[str]) -> None:
     """Display model catalog with availability status."""
-    table = Table(title="Model Catalog", show_lines=True)
-    table.add_column("Model", style="bold")
-    table.add_column("Provider")
-    table.add_column("Input $/M", justify="right")
-    table.add_column("Output $/M", justify="right")
-    table.add_column("Context", justify="right")
-    table.add_column("Env Var")
-    table.add_column("Status", justify="center")
+    table = Table(title=t("display.tables.model_catalog"), show_lines=True)
+    table.add_column(t("display.tables.model"), style="bold")
+    table.add_column(t("display.tables.provider"))
+    table.add_column(t("display.tables.input_cost"), justify="right")
+    table.add_column(t("display.tables.output_cost"), justify="right")
+    table.add_column(t("display.tables.context"), justify="right")
+    table.add_column(t("display.tables.env_var"))
+    table.add_column(t("display.tables.status"), justify="center")
 
     avail_set = set(available)
     for m in models:
         if m.name in avail_set:
-            status = Text("Ready", style="bold green")
+            status = Text(t("display.tables.ready"), style="bold green")
         else:
-            status = Text("No Key", style="red")
+            status = Text(t("display.tables.no_key"), style="red")
 
         table.add_row(
             m.name,
@@ -204,22 +206,69 @@ def display_catalog(models: list[ModelEntry], available: list[str]) -> None:
     if missing:
         env_keys = sorted({m.env_key for m in missing})
         console.print(
-            f"\n[dim]Tip: Set these env vars to unlock more models: {', '.join(env_keys)}[/dim]"
+            f"\n[dim]{t('display.messages.tip_env_vars', keys=', '.join(env_keys))}[/dim]"
         )
 
 
 def display_pre_run_estimate(num_calls: int, estimated_cost: float) -> None:
     """Show estimated API calls and cost before execution."""
     console.print(
-        f"\n[bold]Estimated:[/bold] {num_calls} API calls, ~${estimated_cost:.2f} total cost"
+        f"\n[bold]{t('display.messages.estimated')}[/bold] "
+        f"{t('display.messages.estimated_detail', num_calls=num_calls, cost=estimated_cost)}"
     )
 
 
 def display_results_path(run_dir: str | object) -> None:
     """Show where results are saved with actionable follow-up commands."""
-    console.print(f"\n[bold green]Results saved to:[/bold green] {run_dir}")
-    console.print(f"[dim]  View again: skilleval report {run_dir}[/dim]")
-    console.print(f"[dim]  HTML report: skilleval report {run_dir} --html report.html --open[/dim]")
+    from pathlib import Path
+
+    console.print(f"\n[bold green]{t('display.messages.results_saved')}[/bold green] {run_dir}")
+    run_path = Path(str(run_dir))
+    task_path = run_path.parent.parent  # .skilleval/run-XXX -> task_dir
+    console.print(f"[dim]  {t('display.messages.view_again', task_path=task_path)}[/dim]")
+    console.print(f"[dim]  {t('display.messages.html_report_hint', task_path=task_path)}[/dim]")
+    console.print(f"[dim]  {t('display.messages.run_history_hint', task_path=task_path)}[/dim]")
+
+
+def display_history(runs: list[dict], task_path: str) -> None:
+    """Display a table of past evaluation runs."""
+    table = Table(title=f"{t('display.tables.run_history')} \u2014 {task_path}", show_lines=True)
+    table.add_column(t("display.tables.run"), style="bold")
+    table.add_column(t("display.tables.mode"))
+    table.add_column(t("display.tables.models"), justify="right")
+    table.add_column(t("display.tables.avg_pass_rate"), justify="right")
+    table.add_column(t("display.tables.recommendation"))
+
+    for i, r in enumerate(runs):
+        run_name = r.get("run_dir", "?")
+        mode = r.get("mode", "?")
+        model_count = str(r.get("model_count", len(r.get("models", []))))
+        avg_rate = r.get("avg_pass_rate")
+        rec = r.get("recommendation")
+
+        if avg_rate is not None:
+            rate_pct = f"{avg_rate * 100:.0f}%"
+            if avg_rate == 1.0:
+                rate_style = "green"
+            elif avg_rate >= 0.8:
+                rate_style = "yellow"
+            else:
+                rate_style = "red"
+            rate_text = Text(rate_pct, style=rate_style)
+        else:
+            rate_text = Text("-", style="dim")
+
+        rec_text = rec[:50] + "..." if rec and len(rec) > 53 else (rec or "")
+
+        # Mark the latest run
+        label = run_name
+        if i == 0:
+            label = f"{run_name} [bold cyan]{t('display.tables.latest')}[/bold cyan]"
+
+        table.add_row(label, mode, model_count, rate_text, rec_text)
+
+    console.print(table)
+    console.print(f"\n[dim]{t('display.messages.view_run', task_path=task_path)}[/dim]")
 
 
 def create_progress() -> Progress:
@@ -239,14 +288,14 @@ def create_progress() -> Progress:
 def display_lint_report(report: "LintReport") -> None:
     """Render linter results as a table with severity coloring."""
     if not report.issues:
-        console.print("[bold green]No issues found![/bold green]")
-        console.print(f"Quality Score: [bold]{report.quality_score}[/bold]")
+        console.print(f"[bold green]{t('display.messages.no_issues')}[/bold green]")
+        console.print(f"{t('display.messages.quality_score')} [bold]{report.quality_score}[/bold]")
         return
 
-    table = Table(title="Skill Lint Report", show_lines=True)
-    table.add_column("Severity", style="bold")
-    table.add_column("Line", justify="right")
-    table.add_column("Message")
+    table = Table(title=t("display.tables.skill_lint_report"), show_lines=True)
+    table.add_column(t("display.tables.severity"), style="bold")
+    table.add_column(t("display.tables.line"), justify="right")
+    table.add_column(t("display.tables.message"))
 
     for issue in report.issues:
         sev = issue.severity.lower()
@@ -255,17 +304,17 @@ def display_lint_report(report: "LintReport") -> None:
         table.add_row(Text(sev, style=style), line, issue.message)
 
     console.print(table)
-    console.print(f"Quality Score: [bold]{report.quality_score}[/bold]")
+    console.print(f"{t('display.messages.quality_score')} [bold]{report.quality_score}[/bold]")
 
 
 def display_comparison(report: "ComparisonReport") -> None:
     """Render comparison between two runs (old vs new)."""
-    table = Table(title="Run Comparison", show_lines=True)
-    table.add_column("Model", style="bold")
-    table.add_column("Old Rate", justify="right")
-    table.add_column("New Rate", justify="right")
-    table.add_column("Delta", justify="right")
-    table.add_column("Status", justify="center")
+    table = Table(title=t("display.tables.run_comparison"), show_lines=True)
+    table.add_column(t("display.tables.model"), style="bold")
+    table.add_column(t("display.tables.old_rate"), justify="right")
+    table.add_column(t("display.tables.new_rate"), justify="right")
+    table.add_column(t("display.tables.delta"), justify="right")
+    table.add_column(t("display.tables.status"), justify="center")
 
     # Sort by delta descending, then model name
     entries = sorted(
@@ -294,30 +343,22 @@ def display_comparison(report: "ComparisonReport") -> None:
         )
 
     console.print(table)
-    console.print(f"Summary: {report.summary}")
+    console.print(f"{t('display.messages.summary')} {report.summary}")
 
 
 def display_skill_test_results(
     skill_name: str, results: list[tuple[str, list[ModelResult]]]
 ) -> None:
-    """Display results of testing a skill against multiple test cases.
+    """Display results of testing a skill against multiple test cases."""
+    table = Table(title=f"{t('display.tables.skill_test')} \u2014 {skill_name}", show_lines=True)
+    table.add_column(t("display.tables.test_case"), style="bold")
+    table.add_column(t("display.tables.model"))
+    table.add_column(t("display.tables.pass_rate"), justify="right")
+    table.add_column(t("display.tables.avg_cost"), justify="right")
 
-    Args:
-        skill_name: Name of the skill under test.
-        results: List of tuples (case_name, model_results) where model_results
-                 is the standard Mode 1 per-model results list.
-    """
-    table = Table(title=f"Skill Test — {skill_name}", show_lines=True)
-    table.add_column("Test Case", style="bold")
-    table.add_column("Model")
-    table.add_column("Pass Rate", justify="right")
-    table.add_column("Avg Cost", justify="right")
-
-    # Track per-model success counts across cases for overall summary
-    per_model_totals: dict[str, tuple[int, int]] = {}  # model -> (passing_cases, total_cases)
+    per_model_totals: dict[str, tuple[int, int]] = {}
 
     for case_name, model_results in results:
-        # Sort as in other displays
         for r in sorted(model_results, key=lambda x: (-x.pass_rate, x.avg_cost, x.model)):
             rate_pct = f"{r.pass_rate * 100:.0f}%"
             if r.pass_rate == 1.0:
@@ -331,17 +372,16 @@ def display_skill_test_results(
                 case_name, r.model, Text(rate_pct, style=rate_style), f"${r.avg_cost:.6f}"
             )
 
-            # Update summary counters per model
             ok, total = per_model_totals.get(r.model, (0, 0))
             per_model_totals[r.model] = (ok + (1 if r.pass_rate == 1.0 else 0), total + 1)
 
     console.print(table)
 
     if per_model_totals:
-        console.print("\n[bold]Overall Summary per Model:[/bold]")
+        console.print(f"\n[bold]{t('display.tables.overall_summary')}:[/bold]")
         sum_table = Table(show_lines=True)
-        sum_table.add_column("Model", style="bold")
-        sum_table.add_column("Cases Passing", justify="right")
+        sum_table.add_column(t("display.tables.model"), style="bold")
+        sum_table.add_column(t("display.tables.cases_passing"), justify="right")
         for model, (ok, total) in sorted(per_model_totals.items()):
             sum_table.add_row(model, f"{ok}/{total}")
         console.print(sum_table)

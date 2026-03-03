@@ -1,0 +1,176 @@
+# SkillEval 中文语言包
+# 键名通过 t("section.subsection.key") 引用
+
+display:
+  tables:
+    evaluation_results: "评估结果"
+    model: "模型"
+    pass_rate: "通过率"
+    avg_cost: "平均成本"
+    avg_latency: "平均延迟"
+    total_cost: "总成本"
+    rec: "推荐"
+    provider: "提供商"
+    input_cost: "输入 $/M"
+    output_cost: "输出 $/M"
+    context: "上下文"
+    env_var: "环境变量"
+    status: "状态"
+    ready: "就绪"
+    no_key: "无密钥"
+    model_catalog: "模型目录"
+    creator_executor_matrix: "创建者 x 执行者矩阵（通过率 %）"
+    creator_executor: "创建者 \\ 执行者"
+    meta_skill_comparison: "元技能对比"
+    meta_skill: "元技能"
+    avg_pass_rate: "平均通过率"
+    run_history: "运行历史"
+    run: "运行"
+    mode: "模式"
+    models: "模型数"
+    recommendation: "推荐"
+    skill_lint_report: "技能检查报告"
+    severity: "严重性"
+    line: "行号"
+    message: "信息"
+    run_comparison: "运行对比"
+    old_rate: "旧通过率"
+    new_rate: "新通过率"
+    delta: "变化"
+    skill_test: "技能测试"
+    test_case: "测试用例"
+    cases_passing: "通过用例数"
+    overall_summary: "模型总结"
+    latest: "（最新）"
+
+  messages:
+    recommendation: "推荐："
+    no_perfect: "没有模型达到 100% 通过率。最佳：{model}，通过率 {rate}。"
+    consider_improving: "考虑改进技能描述或增加试验次数。"
+    no_matrix_results: "没有矩阵结果可显示。"
+    best_pair: "最佳组合："
+    cheapest_perfect: "100% 通过最低成本："
+    no_chain_results: "没有链式结果可显示。"
+    best_chain: "最佳链式组合："
+    tip_env_vars: "提示：设置以下环境变量以解锁更多模型：{keys}"
+    estimated: "预估："
+    estimated_detail: "{num_calls} 次 API 调用，约 ${cost:.2f} 总成本"
+    results_saved: "结果已保存至："
+    view_again: "再次查看：skilleval report {task_path}"
+    html_report_hint: "HTML 报告：skilleval report {task_path} --html report.html --open"
+    run_history_hint: "运行历史：skilleval history {task_path}"
+    view_run: "查看运行：skilleval report {task_path}/.skilleval/<run-dir>"
+    no_issues: "未发现问题！"
+    quality_score: "质量分数："
+    summary: "总结："
+    interrupted: "已中断。"
+    error_prefix: "错误："
+    use_vv: "使用 -vv 查看完整堆栈跟踪。"
+    skill_gen_failed: "{name} 技能生成失败：{error}"
+
+runner:
+  phase1_generating: "阶段 1：生成技能..."
+  phase1_generating_meta: "阶段 1：使用元技能生成技能..."
+  phase2_executing: "阶段 2：执行试验..."
+  running_trials: "正在运行试验..."
+
+cli:
+  run:
+    title: "模式 1：技能评估"
+    task_label: "任务："
+    models_label: "模型："
+    trials_label: "试验次数："
+    requires_skill: "模式 1 需要任务文件夹中的 skill.md"
+    resuming: "恢复中：跳过 {count} 个已完成的模型：{models}"
+    no_checkpoint: "未找到检查点，从头开始。"
+    all_completed: "所有模型已完成。"
+
+  matrix:
+    title: "模式 2：矩阵评估"
+    creators_label: "创建者："
+    executors_label: "执行者："
+    requires_prompt: "模式 2 需要任务文件夹中的 prompt.md"
+
+  chain:
+    title: "模式 3：链式评估"
+    meta_skills_label: "元技能："
+    requires_prompt: "模式 3 需要任务文件夹中的 prompt.md"
+    proceed_confirm: "是否继续此运行？"
+    aborted: "已取消。"
+
+  init:
+    created: "已创建任务："
+    config_desc: "比较器、试验次数、模型参数"
+    skill_desc: "系统提示（模式 1）"
+    prompt_desc: "任务描述（模式 2/3）"
+    meta_skill_desc: "元技能模板（模式 3）"
+    input_desc: "模型输入文件"
+    expected_desc: "期望输出（用于比较）"
+    next_steps: "后续步骤："
+    step1: "1. 将输入文件添加到 {path}/input/"
+    step2: "2. 将期望输出添加到 {path}/expected/"
+    step3: "3. 在 {path}/skill.md 中编写技能描述"
+    step4: "4. 运行：skilleval run {path}"
+    see_models: "查看可用模型：skilleval catalog"
+    dir_exists: "目录 '{name}' 已存在"
+
+  history:
+    no_runs: "在 {path}/.skilleval/ 中未找到运行记录"
+    create_hint: "运行 'skilleval run {path}' 来创建一个。"
+
+  report:
+    no_results: "{path} 中没有 results.json。请先运行 'skilleval run {path}'。"
+    no_runs_in: "在 {path} 中未找到运行记录"
+    not_found: "未找到结果文件：{path}"
+    html_written: "HTML 报告已写入：{path}"
+    unknown_mode: "未知模式：{mode}"
+
+  skill_test:
+    title: "技能测试"
+    skill_label: "技能："
+    test_cases_label: "测试用例："
+    no_cases: "在指定目录中未找到有效的测试用例"
+
+  errors:
+    no_models: "没有可用模型。请设置以下环境变量之一："
+    or_endpoint: "或使用 --endpoint 指定自定义 OpenAI 兼容 API。"
+    endpoint_requires_model: "--endpoint 需要同时指定 --model-name。"
+    meta_skill_not_found: "未找到元技能 '{name}'。可用：{available}"
+
+tui:
+  welcome: "SkillEval 交互模式"
+  prompt: "skilleval> "
+  type_help: "输入 /help 查看命令，/quit 退出。"
+  unknown_command: "未知命令：/{command}。输入 /help 查看可用命令。"
+  goodbye: "再见！"
+
+  commands:
+    run: "使用给定技能评估模型"
+    matrix: "创建者 x 执行者矩阵评估"
+    chain: "元技能链式评估"
+    catalog: "显示模型目录"
+    language: "切换语言（中/英）"
+    init: "创建新任务文件夹"
+    report: "查看历史运行结果"
+    history: "列出任务的历史运行"
+    lint: "验证技能文件结构"
+    compare: "对比两次运行"
+    help: "显示此帮助"
+    quit: "退出交互模式"
+
+  prompts:
+    task_path: "任务路径"
+    models: "模型（逗号分隔，回车选择全部）"
+    trials: "试验次数（回车使用配置默认值）"
+    creators: "创建者模型（逗号分隔）"
+    executors: "执行者模型（逗号分隔）"
+    meta_skills: "元技能名称（逗号分隔）"
+    skill_path: "技能文件路径"
+    results_path: "结果路径"
+    old_run: "旧运行路径"
+    new_run: "新运行路径"
+    task_name: "任务名称"
+
+  language:
+    current: "当前语言：{lang}"
+    switched: "语言已切换为：{lang}"
