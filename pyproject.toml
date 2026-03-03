@@ -5,19 +5,29 @@ build-backend = "hatchling.build"
 [project]
 name = "skilleval"
 version = "0.1.0"
-description = "Find the cheapest model that gets your task 100% right"
+description = "Find the cheapest LLM that gets your task 100% right"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
+authors = [
+    { name = "King Hin Chan" },
+]
+keywords = ["llm", "evaluation", "benchmark", "cost-optimization", "ai", "nlp"]
 classifiers = [
+    "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Environment :: Console",
+    "Typing :: Typed",
 ]
+
 dependencies = [
     "click>=8.0",
     "pyyaml>=6.0",
@@ -25,6 +35,12 @@ dependencies = [
     "aiohttp>=3.9",
     "rich>=13.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/chan-kinghin/skills-eval"
+Repository = "https://github.com/chan-kinghin/skills-eval"
+Documentation = "https://github.com/chan-kinghin/skills-eval/blob/main/docs/USER_MANUAL.md"
+Issues = "https://github.com/chan-kinghin/skills-eval/issues"
 
 [project.optional-dependencies]
 docs = [
@@ -45,6 +61,9 @@ skilleval = "skilleval.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/skilleval"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/skilleval/default_models.yaml" = "skilleval/default_models.yaml"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
