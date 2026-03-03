@@ -17,7 +17,8 @@ pip install -e ".[dev,docs]"
 ## 运行测试和代码检查
 
 ```bash
-pytest                    # 运行所有测试（离线运行，无需 API 密钥）
+pytest                    # 运行 200+ 离线测试（无需 API 密钥）
+pytest --cov=skilleval    # 运行测试并生成覆盖率报告
 ruff check src/ tests/    # 代码风格检查
 ```
 
@@ -27,14 +28,14 @@ ruff check src/ tests/    # 代码风格检查
 
 ```
 src/skilleval/
-├── cli.py              # Click CLI 命令（init、run、matrix、chain、catalog、report、lint、compare、skill-test）
-├── config.py           # 任务文件夹加载、模型目录、过滤、临时模型构建
+├── cli.py              # Click CLI 命令（init、run、matrix、chain、catalog、report、lint、compare、skill-test），支持 --json、-v、--yes 参数
+├── config.py           # 任务文件夹加载、模型目录、过滤、临时模型构建、配置校验
 ├── client.py           # 异步 OpenAI 兼容 HTTP 客户端，支持重试
-├── engine.py           # 并发控制（全局 + 按供应商信号量）
-├── runner.py           # 模式 1/2/3 编排器
+├── engine.py           # 并发控制（全局 + 按供应商信号量、熔断器）
+├── runner.py           # 模式 1/2/3 编排器，支持 Ctrl+C 处理
 ├── models.py           # Pydantic 数据模型（共享契约）
 ├── documents.py        # PDF/DOCX/XLSX 文本提取
-├── display.py          # Rich 控制台输出辅助工具
+├── display.py          # Rich 控制台输出辅助工具，带 ETA 的进度条
 ├── results.py          # 结果文件写入器
 ├── linter.py           # Claude Code 技能结构验证
 ├── skill_parser.py     # 技能提示词提取和测试用例加载
@@ -99,3 +100,4 @@ COMPARATORS["my_comparator"] = MyComparator
 - 使用 [ruff](https://docs.astral.sh/ruff/) 进行格式化和代码检查
 - 行宽限制：100 字符
 - 测试使用 `pytest`，配合 `tmp_path` fixture 进行文件系统测试
+- 使用 `logging.getLogger(__name__)` 作为模块级日志记录器。日志通过 CLI 的 `-v` 参数输出到 stderr。

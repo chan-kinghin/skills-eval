@@ -23,6 +23,9 @@ skilleval init my-task
 # Add your input files, expected output, and skill prompt
 # Then run the evaluation
 skilleval run my-task/
+
+# Machine-readable output
+skilleval run my-task/ --json | jq '.recommendation'
 ```
 
 ## Supported Providers
@@ -46,6 +49,14 @@ skilleval run my-task/
 - **Skill testing (`skill-test`)** — Test a skill's core prompt logic against expected outputs.
 - **Run comparison (`compare`)** — Diff two runs to detect improvements or regressions.
 - **HTML reports (`report --html`)** — Generate self-contained HTML reports for sharing.
+- **JSON output (`--json`)** — Machine-readable JSON on `run`, `matrix`, `chain`, `catalog`, and `report` commands for piping into other tools.
+- **Verbose logging (`-v` / `-vv`)** — `-v` for INFO, `-vv` for DEBUG. Logs go to stderr so they don't interfere with `--json` output.
+- **Auto-confirm (`--yes` / `-y`)** — Skip the confirmation prompt on `chain` (replaces the old `--confirm` flag).
+- **Config validation** — Warns on unknown keys in `config.yaml` and validates comparator names at load time.
+- **Circuit breaker** — Automatically skips a provider after 5 consecutive failures, avoiding wasted time and cost.
+- **Ctrl+C handling** — Saves partial results on interrupt so you never lose a half-finished run.
+- **Friendly errors** — No raw tracebacks by default; use `-vv` to see full stack traces when debugging.
+- **Progress bar** — Now shows elapsed time and ETA alongside the completion percentage.
 
 ## Documentation
 

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from skilleval.comparators import get_comparator
 from skilleval.comparators.base import strip_markdown_fences, strip_reasoning_tags
-from skilleval.display import console, create_progress
+from skilleval.display import console, create_progress, display_results_path
 from skilleval.documents import format_input_files, input_descriptions
 from skilleval.engine import ExecutionEngine, TrialSpec
 from skilleval.models import (
@@ -183,7 +183,7 @@ async def run_mode1(
         recommendation=recommendation,
     )
     writer.write_summary(summary)
-    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+    display_results_path(writer.run_dir)
 
     if interrupted:
         raise KeyboardInterrupt
@@ -378,7 +378,7 @@ async def run_mode2(
         recommendation=recommendation,
     )
     writer.write_summary(summary)
-    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+    display_results_path(writer.run_dir)
 
     if interrupted:
         raise KeyboardInterrupt
@@ -582,7 +582,7 @@ async def run_mode3(
         recommendation=recommendation,
     )
     writer.write_summary(summary)
-    console.print(f"[dim]Results saved to {writer.run_dir}[/dim]")
+    display_results_path(writer.run_dir)
 
     if interrupted:
         raise KeyboardInterrupt

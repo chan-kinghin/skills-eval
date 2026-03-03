@@ -17,7 +17,8 @@ pip install -e ".[dev,docs]"
 ## Running Tests and Linter
 
 ```bash
-pytest                    # run all tests (offline, no API keys needed)
+pytest                    # run 200+ offline tests (no API keys needed)
+pytest --cov=skilleval    # run tests with coverage
 ruff check src/ tests/    # lint
 ```
 
@@ -27,14 +28,14 @@ All tests must pass before submitting a PR. The CI pipeline runs both lint and t
 
 ```
 src/skilleval/
-├── cli.py              # Click CLI commands (init, run, matrix, chain, catalog, report, lint, compare, skill-test)
-├── config.py           # Task folder loading, model catalog, filtering, ad-hoc model builder
+├── cli.py              # Click CLI commands (init, run, matrix, chain, catalog, report, lint, compare, skill-test) with --json, -v, --yes flags
+├── config.py           # Task folder loading, model catalog, filtering, ad-hoc model builder, config validation
 ├── client.py           # Async OpenAI-compatible HTTP client with retry
-├── engine.py           # Concurrency control (global + per-provider semaphores)
-├── runner.py           # Mode 1/2/3 orchestrators
+├── engine.py           # Concurrency control (global + per-provider semaphores, circuit breaker)
+├── runner.py           # Mode 1/2/3 orchestrators with Ctrl+C handling
 ├── models.py           # Pydantic data models (shared contracts)
 ├── documents.py        # PDF/DOCX/XLSX text extraction
-├── display.py          # Rich console output helpers
+├── display.py          # Rich console output helpers, progress bar with ETA
 ├── results.py          # Result file writer
 ├── linter.py           # Claude Code skill structure validation
 ├── skill_parser.py     # Skill prompt extraction and test case loading
@@ -99,3 +100,4 @@ COMPARATORS["my_comparator"] = MyComparator
 - Formatted and linted with [ruff](https://docs.astral.sh/ruff/)
 - Line length: 100 characters
 - Tests use `pytest` with `tmp_path` fixtures for filesystem tests
+- Use `logging.getLogger(__name__)` for module-level loggers. Logging goes to stderr via the CLI's `-v` flag.

@@ -32,6 +32,17 @@ from skilleval.display import (
 from skilleval.models import ModelEntry, ModelResult, RunSummary
 
 
+def _no_models_error(catalog: list[ModelEntry]) -> click.ClickException:
+    """Build an actionable error when no models have API keys configured."""
+    env_keys = sorted({m.env_key for m in catalog if m.env_key != "_ADHOC_"})
+    hint = (
+        "No models available. Set one of these env vars to get started:\n"
+        + "\n".join(f"  export {k}=<your-key>" for k in env_keys)
+        + "\n\nOr use --endpoint for a custom OpenAI-compatible API."
+    )
+    return click.ClickException(hint)
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────
 
 
@@ -89,7 +100,30 @@ def _configure_logging(verbosity: int) -> None:
         root_logger.setLevel(level)
 
 
-@click.group()
+class _SkillEvalGroup(click.Group):
+    """Custom Click group with user-friendly exception handling."""
+
+    def invoke(self, ctx: click.Context) -> None:
+        try:
+            return super().invoke(ctx)
+        except click.exceptions.Exit:
+            raise
+        except click.ClickException:
+            raise
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Interrupted.[/yellow]")
+            ctx.exit(130)
+        except Exception as e:
+            # Show friendly error; use -vv to see traceback
+            verbosity = ctx.obj.get("verbosity", 0) if ctx.obj else 0
+            if verbosity >= 2:
+                raise
+            console.print(f"\n[red]Error:[/red] {e}")
+            console.print("[dim]Use -vv for full traceback.[/dim]")
+            ctx.exit(1)
+
+
+@click.group(cls=_SkillEvalGroup)
 @click.version_option(package_name="skilleval")
 @click.option(
     "-v",
@@ -161,14 +195,18 @@ def init(name: str) -> None:
         "output_format: json\n"
     )
 
-    click.echo(f"Created task folder: {task_path}")
-    click.echo()
-    click.echo("Next steps:")
-    click.echo(f"  1. Add input files to {task_path}/input/")
-    click.echo(f"  2. Add expected output files to {task_path}/expected/")
-    click.echo(f"  3. Write your skill in {task_path}/skill.md")
-    click.echo(f"  4. Edit {task_path}/config.yaml as needed")
-    click.echo(f"  5. Run: skilleval run {task_path}")
+    console.print(f"\n[bold green]Created task folder:[/bold green] {task_path}")
+    console.print()
+    console.print("[bold]Next steps:[/bold]")
+    console.print(f"  1. Add input files to [cyan]{task_path}/input/[/cyan]")
+    console.print(f"  2. Add expected output files to [cyan]{task_path}/expected/[/cyan]")
+    console.print(f"  3. Write your skill in [cyan]{task_path}/skill.md[/cyan]")
+    console.print(f"  4. Edit [cyan]{task_path}/config.yaml[/cyan] as needed")
+    console.print(f"  5. Run: [bold]skilleval run {task_path}[/bold]")
+    console.print()
+    console.print("[dim]Available comparators: json_exact, csv_ordered, csv_unordered, "
+                  "field_subset, file_hash, custom[/dim]")
+    console.print("[dim]Check available models: skilleval catalog[/dim]")
 
 
 # ── Mode 1: Skill Evaluation ────────────────────────────────────────────
@@ -183,6 +221,7 @@ def init(name: str) -> None:
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
+@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
 def run(
     task_path: str,
     models: str | None,
@@ -192,6 +231,7 @@ def run(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    json_output: bool,
 ) -> None:
     """Mode 1: Evaluate models with a given skill."""
     try:
@@ -211,9 +251,7 @@ def run(
             selected = filter_available(catalog)
 
         if not selected:
-            raise click.ClickException(
-                "No models available. Set API key env vars or use --models to specify."
-            )
+            raise _no_models_error(catalog)
 
         num_calls = len(selected) * task.config.trials
         avg_input_cost = sum(m.input_cost_per_m for m in selected) / len(selected)
@@ -222,14 +260,19 @@ def run(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        console.print("[bold]Mode 1: Skill Evaluation[/bold]")
-        console.print(f"Task: {task.path}")
-        console.print(f"Models: {', '.join(m.name for m in selected)}")
-        console.print(f"Trials: {task.config.trials}")
-        display_pre_run_estimate(num_calls, estimated_cost)
+        if not json_output:
+            console.print("[bold]Mode 1: Skill Evaluation[/bold]")
+            console.print(f"Task: {task.path}")
+            console.print(f"Models: {', '.join(m.name for m in selected)}")
+            console.print(f"Trials: {task.config.trials}")
+            display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode1(task, selected, parallel))
-        display_run_results(summary.model_results, summary.recommendation)
+
+        if json_output:
+            click.echo(summary.model_dump_json(indent=2))
+        else:
+            display_run_results(summary.model_results, summary.recommendation)
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -256,6 +299,7 @@ async def _run_mode1(task, selected, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
+@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
 def matrix(
     task_path: str,
     creators: str,
@@ -266,6 +310,7 @@ def matrix(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    json_output: bool,
 ) -> None:
     """Mode 2: Creator x executor matrix evaluation."""
     try:
@@ -290,17 +335,21 @@ def matrix(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
-        console.print(f"Task: {task.path}")
-        console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
-        console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
-        display_pre_run_estimate(num_calls, estimated_cost)
+        if not json_output:
+            console.print("[bold]Mode 2: Matrix Evaluation[/bold]")
+            console.print(f"Task: {task.path}")
+            console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
+            console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
+            display_pre_run_estimate(num_calls, estimated_cost)
 
         summary = asyncio.run(_run_mode2(task, creator_models, executor_models, parallel))
-        display_matrix_results(summary.matrix_results)
 
-        if summary.recommendation:
-            console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
+        if json_output:
+            click.echo(summary.model_dump_json(indent=2))
+        else:
+            display_matrix_results(summary.matrix_results)
+            if summary.recommendation:
+                console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -330,6 +379,7 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
+@click.option("--json", "json_output", is_flag=True, help="Output results as JSON (for piping)")
 def chain(
     task_path: str,
     meta_skills: str,
@@ -342,6 +392,7 @@ def chain(
     endpoint: str | None,
     api_key: str | None,
     model_name: str | None,
+    json_output: bool,
 ) -> None:
     """Mode 3: Meta-skill x creator x executor chain evaluation."""
     try:
@@ -378,12 +429,13 @@ def chain(
             1000 / 1_000_000 * avg_input_cost + 4000 / 1_000_000 * avg_output_cost
         )
 
-        console.print("[bold]Mode 3: Chain Evaluation[/bold]")
-        console.print(f"Task: {task.path}")
-        console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
-        console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
-        console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
-        display_pre_run_estimate(total_calls, estimated_cost)
+        if not json_output:
+            console.print("[bold]Mode 3: Chain Evaluation[/bold]")
+            console.print(f"Task: {task.path}")
+            console.print(f"Meta-skills: {', '.join(meta_skill_names)}")
+            console.print(f"Creators: {', '.join(m.name for m in creator_models)}")
+            console.print(f"Executors: {', '.join(m.name for m in executor_models)}")
+            display_pre_run_estimate(total_calls, estimated_cost)
 
         if total_calls > 100 and not yes:
             if not click.confirm("Proceed with this run?"):
@@ -393,10 +445,13 @@ def chain(
         summary = asyncio.run(
             _run_mode3(task, meta_skill_names, creator_models, executor_models, parallel)
         )
-        display_chain_results(summary.chain_results)
 
-        if summary.recommendation:
-            console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
+        if json_output:
+            click.echo(summary.model_dump_json(indent=2))
+        else:
+            display_chain_results(summary.chain_results)
+            if summary.recommendation:
+                console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -416,13 +471,32 @@ async def _run_mode3(task, meta_skill_names, creator_models, executor_models, pa
 
 @cli.command("catalog")
 @click.option("--catalog", "catalog_path", default=None, help="Path to model catalog YAML")
-def catalog_cmd(catalog_path: str | None) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output catalog as JSON")
+def catalog_cmd(catalog_path: str | None, json_output: bool) -> None:
     """Display model catalog with availability status."""
     try:
         catalog = load_catalog(catalog_path)
         available = filter_available(catalog)
         available_names = [m.name for m in available]
-        display_catalog(catalog, available_names)
+
+        if json_output:
+            import json as json_mod
+
+            data = [
+                {
+                    "name": m.name,
+                    "provider": m.provider,
+                    "input_cost_per_m": m.input_cost_per_m,
+                    "output_cost_per_m": m.output_cost_per_m,
+                    "context_window": m.context_window,
+                    "env_key": m.env_key,
+                    "available": m.name in set(available_names),
+                }
+                for m in catalog
+            ]
+            click.echo(json_mod.dumps(data, indent=2))
+        else:
+            display_catalog(catalog, available_names)
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -432,7 +506,8 @@ def catalog_cmd(catalog_path: str | None) -> None:
 @click.argument("results_path")
 @click.option("--html", "html_path", default=None, help="Generate HTML report at path")
 @click.option("--open", "open_browser", is_flag=True, help="Open HTML in browser")
-def report(results_path: str, html_path: str | None, open_browser: bool) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output results as JSON")
+def report(results_path: str, html_path: str | None, open_browser: bool, json_output: bool) -> None:
     """Re-render results from a previous run."""
     try:
         path = Path(results_path)
@@ -443,6 +518,10 @@ def report(results_path: str, html_path: str | None, open_browser: bool) -> None
 
         data = json.loads(results_file.read_text())
         summary = RunSummary(**data)
+
+        if json_output:
+            click.echo(summary.model_dump_json(indent=2))
+            return
 
         if html_path:
             from skilleval.html_report import generate_html_report
@@ -538,9 +617,7 @@ def skill_test(
             selected = filter_available(catalog)
 
         if not selected:
-            raise click.ClickException(
-                "No models available. Set API key env vars or use --models to specify."
-            )
+            raise _no_models_error(catalog)
 
         for case in cases:
             if trials is not None:

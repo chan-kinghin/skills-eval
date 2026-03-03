@@ -379,12 +379,12 @@ skilleval chain my-task \
 
 ### Confirmation for Large Runs
 
-If the total number of API calls exceeds 100, SkillEval asks for confirmation before proceeding. Use `--confirm` to skip this prompt:
+If the total number of API calls exceeds 100, SkillEval asks for confirmation before proceeding. Use `--yes` (or `-y`) to skip this prompt:
 
 ```bash
 skilleval chain my-task \
   --meta-skills a,b,c --creators x,y --executors p,q,r \
-  --trials 10 --confirm
+  --trials 10 --yes
 ```
 
 ### Output
@@ -605,8 +605,9 @@ Usage: skilleval [OPTIONS] COMMAND [ARGS]...
   SkillEval: Find the cheapest model that gets your task 100% right.
 
 Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
+  --version      Show the version and exit.
+  -v, --verbose  Increase verbosity (-v for INFO, -vv for DEBUG).
+  --help         Show this message and exit.
 
 Commands:
   catalog     Display model catalog with availability status.
@@ -640,6 +641,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--json` | No | `false` | Output results as JSON (for piping) |
 
 ### `skilleval matrix`
 
@@ -654,6 +656,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--json` | No | `false` | Output results as JSON (for piping) |
 
 ### `skilleval chain`
 
@@ -666,16 +669,18 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--trials` | No | From config | Override trial count |
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
-| `--confirm` | No | `false` | Skip confirmation for large runs (>100 API calls) |
+| `--yes` / `-y` | No | `false` | Skip confirmation for large runs (>100 API calls) |
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--json` | No | `false` | Output results as JSON (for piping) |
 
 ### `skilleval catalog`
 
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--json` | No | `false` | Output catalog as JSON |
 
 ### `skilleval report`
 
@@ -684,6 +689,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `RESULTS_PATH` | Yes | — | Path to results directory or `results.json` file |
 | `--html` | No | — | Path to write HTML report |
 | `--open` | No | `false` | Open HTML report in browser after generation |
+| `--json` | No | `false` | Output results as JSON |
 
 Re-renders results from a previous run without making any API calls. Optionally generates a self-contained HTML report.
 
@@ -735,6 +741,8 @@ Each task folder contains a `config.yaml` file that controls evaluation behavior
 | `temperature` | float | `0.0` | Model sampling temperature. Use `0.0` for deterministic output |
 | `max_tokens` | int | `4096` | Maximum number of output tokens per request |
 | `output_format` | string | `"json"` | Expected output format (for display purposes) |
+
+**Validation:** SkillEval warns if your `config.yaml` contains unknown keys (possible typos). It also validates the `comparator` value at load time, reporting available options if the name is unrecognized.
 
 ### Example Configuration
 
@@ -1277,12 +1285,7 @@ Then re-run the evaluation.
 
 **Cause:** No API key environment variables are set.
 
-**Fix:** Set at least one API key:
-```bash
-export DASHSCOPE_API_KEY="sk-..."
-```
-
-Run `skilleval catalog` to verify which models show "Ready."
+**Fix:** SkillEval now shows the exact `export` commands you need. Run `skilleval catalog` to see all models and the env var each one requires.
 
 ### "Mode 1 requires skill.md in the task folder"
 
@@ -1364,3 +1367,32 @@ If fewer than 10 trials were run, the recommendation includes a warning that con
 - **50+ trials** — Statistical rigor for mission-critical tasks.
 
 Use `temperature: 0.0` for deterministic tasks. Even at temperature 0, models can occasionally produce different outputs due to batching or internal non-determinism, which is why multiple trials matter.
+
+### "Unknown config keys" warning
+
+**Cause:** Your `config.yaml` contains keys that SkillEval doesn't recognize (likely typos).
+
+**Fix:** Check the warning message for the list of valid keys: `comparator`, `custom_script`, `trials`, `timeout`, `temperature`, `max_tokens`, `output_format`.
+
+### Circuit breaker messages
+
+**Cause:** A provider had 5 consecutive failures (errors, timeouts, or empty responses). SkillEval automatically skips remaining trials for that provider to avoid wasting time and money.
+
+**Fix:** Check the provider's status page. If the issue is rate limiting, reduce `--parallel`. The circuit breaker resets on the next successful response.
+
+### Getting machine-readable output
+
+Use `--json` on any command to get JSON output suitable for piping:
+
+```bash
+skilleval run my-task --json | jq '.recommendation'
+skilleval catalog --json | jq '.[] | select(.available) | .name'
+```
+
+### Debugging with verbose mode
+
+Use `-v` for INFO-level logs (shows API request URLs, retry attempts) or `-vv` for DEBUG-level logs (full request/response details). Logs go to stderr so they don't interfere with `--json` output:
+
+```bash
+skilleval -vv run my-task --json 2>debug.log | jq .
+```

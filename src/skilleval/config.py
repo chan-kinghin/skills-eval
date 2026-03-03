@@ -9,9 +9,45 @@ from urllib.parse import urlparse
 
 import yaml
 
+from skilleval.comparators import COMPARATORS
 from skilleval.models import ModelEntry, TaskConfig, TaskFolder
 
 logger = logging.getLogger(__name__)
+
+_KNOWN_CONFIG_KEYS = frozenset(TaskConfig.model_fields.keys())
+
+
+def _validate_config(raw: dict, config_path: Path) -> TaskConfig:
+    """Parse config.yaml into a TaskConfig, warning on unknown keys and bad comparator."""
+    if not raw:
+        raw = {}
+
+    unknown = set(raw.keys()) - _KNOWN_CONFIG_KEYS
+    if unknown:
+        logger.warning(
+            "Unknown keys in %s: %s (will be ignored). Valid keys: %s",
+            config_path,
+            ", ".join(sorted(unknown)),
+            ", ".join(sorted(_KNOWN_CONFIG_KEYS)),
+        )
+        import click
+
+        click.echo(
+            f"Warning: Unknown config keys in {config_path.name}: "
+            f"{', '.join(sorted(unknown))}",
+            err=True,
+        )
+
+    config = TaskConfig(**{k: v for k, v in raw.items() if k in _KNOWN_CONFIG_KEYS})
+
+    if config.comparator not in COMPARATORS:
+        available = ", ".join(sorted(COMPARATORS))
+        raise ValueError(
+            f"Unknown comparator '{config.comparator}' in {config_path}. "
+            f"Available: {available}"
+        )
+
+    return config
 
 
 def load_task(task_path: str | Path) -> TaskFolder:
@@ -24,7 +60,7 @@ def load_task(task_path: str | Path) -> TaskFolder:
         raise FileNotFoundError(f"No config.yaml found in {task_path}")
 
     raw = yaml.safe_load(config_path.read_text())
-    config = TaskConfig(**(raw or {}))
+    config = _validate_config(raw or {}, config_path)
 
     input_dir = task_path / "input"
     expected_dir = task_path / "expected"

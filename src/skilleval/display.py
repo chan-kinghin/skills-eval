@@ -3,7 +3,15 @@
 from __future__ import annotations
 
 from rich.console import Console
-from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from rich.table import Table
 from rich.text import Text
 
@@ -165,6 +173,7 @@ def display_catalog(models: list[ModelEntry], available: list[str]) -> None:
     table.add_column("Input $/M", justify="right")
     table.add_column("Output $/M", justify="right")
     table.add_column("Context", justify="right")
+    table.add_column("Env Var")
     table.add_column("Status", justify="center")
 
     avail_set = set(available)
@@ -180,10 +189,20 @@ def display_catalog(models: list[ModelEntry], available: list[str]) -> None:
             f"${m.input_cost_per_m:.2f}",
             f"${m.output_cost_per_m:.2f}",
             f"{m.context_window:,}",
+            Text(m.env_key, style="dim"),
             status,
         )
 
     console.print(table)
+
+    # Show a hint if some models lack keys
+    missing = [m for m in models if m.name not in avail_set]
+    if missing:
+        env_keys = sorted({m.env_key for m in missing})
+        console.print(
+            f"\n[dim]Tip: Set these env vars to unlock more models: "
+            f"{', '.join(env_keys)}[/dim]"
+        )
 
 
 def display_pre_run_estimate(num_calls: int, estimated_cost: float) -> None:
@@ -194,14 +213,23 @@ def display_pre_run_estimate(num_calls: int, estimated_cost: float) -> None:
     )
 
 
+def display_results_path(run_dir: str | object) -> None:
+    """Show where results are saved with actionable follow-up commands."""
+    console.print(f"\n[bold green]Results saved to:[/bold green] {run_dir}")
+    console.print(f"[dim]  View again: skilleval report {run_dir}[/dim]")
+    console.print(f"[dim]  HTML report: skilleval report {run_dir} --html report.html --open[/dim]")
+
+
 def create_progress() -> Progress:
-    """Create a Rich progress bar for real-time tracking."""
+    """Create a Rich progress bar with elapsed time and ETA."""
     return Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         BarColumn(),
         TaskProgressColumn(),
         TextColumn("[dim]{task.completed}/{task.total}[/dim]"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
         console=console,
     )
 

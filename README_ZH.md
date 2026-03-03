@@ -23,6 +23,9 @@ skilleval init my-task
 # 添加输入文件、预期输出和技能提示词
 # 然后运行评估
 skilleval run my-task/
+
+# 机器可读输出
+skilleval run my-task/ --json | jq '.recommendation'
 ```
 
 ## 支持的供应商
@@ -46,6 +49,14 @@ skilleval run my-task/
 - **技能测试（`skill-test`）** — 将技能的核心提示逻辑与预期输出进行测试。
 - **运行比较（`compare`）** — 对比两次运行结果以检测改进或退化。
 - **HTML 报告（`report --html`）** — 生成独立的 HTML 报告以便分享。
+- **JSON 输出（`--json`）** — 在 `run`、`matrix`、`chain`、`catalog` 和 `report` 命令上输出机器可读的 JSON，方便与其他工具管道对接。
+- **详细日志（`-v` / `-vv`）** — `-v` 显示 INFO 级别，`-vv` 显示 DEBUG 级别。日志输出到 stderr，不会干扰 `--json` 输出。
+- **自动确认（`--yes` / `-y`）** — 跳过 `chain` 命令的确认提示（替代原来的 `--confirm` 参数）。
+- **配置校验** — 对 `config.yaml` 中的未知键发出警告，并在加载时验证比较器名称。
+- **熔断机制** — 某个供应商连续失败 5 次后自动跳过，避免浪费时间和费用。
+- **Ctrl+C 处理** — 中断时保存已有结果，避免丢失未完成的运行数据。
+- **友好的错误提示** — 默认不显示原始堆栈信息；使用 `-vv` 可查看完整的错误追踪。
+- **进度条** — 现在显示已用时间和预计剩余时间。
 
 ## 文档
 
