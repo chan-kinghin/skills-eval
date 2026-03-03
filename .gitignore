@@ -7,6 +7,9 @@ build/
 .venv/
 *.egg
 
+# Auto-generated version file (hatch-vcs)
+src/skilleval/_version.py
+
 # SkillEval run results (ephemeral, regenerated per run)
 .skilleval/
 

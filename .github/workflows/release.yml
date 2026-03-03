@@ -1,0 +1,77 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # for creating GitHub Releases
+  id-token: write   # for PyPI trusted publisher (OIDC)
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for hatch-vcs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: ruff check src/ tests/
+      - run: pytest --cov=skilleval --cov-report=term-missing
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history for hatch-vcs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        # Uses trusted publisher (OIDC) — no token needed
+        # Configure at: https://pypi.org/manage/project/skilleval/settings/publishing/
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --generate-notes
