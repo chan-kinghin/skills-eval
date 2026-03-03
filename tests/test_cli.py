@@ -26,8 +26,8 @@ class TestInitCommand:
         assert (task_dir / "meta-skill.md").exists()
         assert (task_dir / "input").is_dir()
         assert (task_dir / "expected").is_dir()
-        assert (task_dir / "input" / "sample.txt").exists()
-        assert (task_dir / "expected" / "sample.txt").exists()
+        assert (task_dir / "input" / "example.txt").exists()
+        assert (task_dir / "expected" / "example.txt").exists()
 
     def test_init_config_has_comparator(self, tmp_path: Path):
         runner = CliRunner()
@@ -237,3 +237,161 @@ class TestResolveOutputFormat:
         from skilleval.cli import _resolve_output_format
 
         assert _resolve_output_format(None, False) == "rich"
+
+
+class TestResultWriter:
+    """Test ResultWriter filesystem layout improvements."""
+
+    def test_trial_output_no_trials_intermediate_dir(self, tmp_path: Path):
+        """Trial output should be at run-dir/model/trial-N/, not run-dir/trials/model/trial-N/."""
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        writer.write_trial_output("qwen-turbo", 1, "hello", None, {"passed": True})
+
+        trial_dir = writer.run_dir / "qwen-turbo" / "trial-1"
+        assert trial_dir.is_dir()
+        assert (trial_dir / "output.txt").read_text() == "hello"
+        assert (trial_dir / "meta.json").exists()
+
+        # Old layout should NOT exist
+        assert not (writer.run_dir / "trials").exists()
+
+    def test_latest_symlink_created(self, tmp_path: Path):
+        """write_summary should create a .skilleval/latest symlink."""
+        from skilleval.models import RunSummary
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+        )
+        writer.write_summary(summary)
+
+        latest = tmp_path / ".skilleval" / "latest"
+        assert latest.is_symlink()
+        assert latest.resolve() == writer.run_dir.resolve()
+
+    def test_latest_symlink_updated_on_second_run(self, tmp_path: Path):
+        """A second run should update the latest symlink."""
+        from skilleval.models import RunSummary
+        from skilleval.results import ResultWriter
+
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+        )
+
+        writer1 = ResultWriter(tmp_path, "run")
+        writer1.write_summary(summary)
+
+        writer2 = ResultWriter(tmp_path, "run")
+        writer2.write_summary(summary)
+
+        latest = tmp_path / ".skilleval" / "latest"
+        assert latest.resolve() == writer2.run_dir.resolve()
+
+    def test_run_config_json_created(self, tmp_path: Path):
+        """write_summary should create a run-config.json."""
+        from skilleval.models import RunSummary
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+        )
+        writer.write_summary(summary)
+
+        config_path = writer.run_dir / "run-config.json"
+        assert config_path.exists()
+        config = json.loads(config_path.read_text())
+        assert config["mode"] == "run"
+        assert config["task"] == tmp_path.name
+
+    def test_results_json_excludes_output_text(self, tmp_path: Path):
+        """results.json should NOT contain output_text (it's in per-trial files)."""
+        from skilleval.models import ModelResult, RunSummary, TrialResult
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        trial = TrialResult(
+            model="test",
+            trial_number=1,
+            passed=True,
+            output_text="this should be excluded",
+        )
+        mr = ModelResult(
+            model="test",
+            pass_rate=1.0,
+            trials=[trial],
+            avg_cost=0.001,
+            avg_latency=0.5,
+            total_cost=0.001,
+        )
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+            model_results=[mr],
+        )
+        writer.write_summary(summary)
+
+        results = json.loads((writer.run_dir / "results.json").read_text())
+        # output_text should be stripped from the serialized results
+        for mr_data in results["model_results"]:
+            for trial_data in mr_data["trials"]:
+                assert "output_text" not in trial_data
+
+    def test_summary_txt_uses_task_name_not_absolute_path(self, tmp_path: Path):
+        """summary.txt should use the task directory name, not an absolute path."""
+        from skilleval.models import RunSummary
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+        )
+        writer.write_summary(summary)
+
+        text = (writer.run_dir / "summary.txt").read_text()
+        assert f"Task: {tmp_path.name}" in text
+        # Should NOT contain an absolute path
+        assert "/Users/" not in text
+        assert "/tmp/" not in text or tmp_path.name in text
+
+
+class TestHistoryCommand:
+    """Test skilleval history command."""
+
+    def test_history_no_runs(self, tmp_path: Path):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["history", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "No runs found" in result.output
+
+    def test_history_with_runs(self, tmp_path: Path):
+        """History should list past runs."""
+        from skilleval.models import RunSummary
+        from skilleval.results import ResultWriter
+
+        writer = ResultWriter(tmp_path, "run")
+        summary = RunSummary(
+            mode="run",
+            task_path=tmp_path.name,
+            timestamp="2026-01-01T00:00:00",
+            recommendation="test-model ($0.001/run)",
+        )
+        writer.write_summary(summary)
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["history", str(tmp_path)])
+        assert result.exit_code == 0
+        assert "latest" in result.output
+        assert "run" in result.output

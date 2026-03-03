@@ -21,14 +21,18 @@
 11. [Skill Testing (`skill-test`)](#11-skill-testing)
 12. [Run Comparison (`compare`)](#12-run-comparison)
 13. [HTML Reports](#13-html-reports)
-14. [CLI Reference](#14-cli-reference)
-15. [Configuration (`config.yaml`)](#15-configuration)
-16. [Model Catalog](#16-model-catalog)
-17. [Supported Input Files](#17-supported-input-files)
-18. [Comparators](#18-comparators)
-19. [Results & Output](#19-results--output)
-20. [Sample Walkthrough](#20-sample-walkthrough)
-21. [Troubleshooting / FAQ](#21-troubleshooting--faq)
+14. [Interactive TUI Mode](#14-interactive-tui-mode)
+15. [Run History (`history`)](#15-run-history)
+16. [Internationalization (i18n)](#16-internationalization)
+17. [CLI Reference](#17-cli-reference)
+18. [Configuration (`config.yaml`)](#18-configuration)
+19. [Model Catalog](#19-model-catalog)
+20. [Supported Input Files](#20-supported-input-files)
+21. [Comparators](#21-comparators)
+22. [Results & Output](#22-results--output)
+23. [Test Case Walkthrough](#23-test-case-walkthrough)
+24. [Sample Walkthrough](#24-sample-walkthrough)
+25. [Troubleshooting / FAQ](#25-troubleshooting--faq)
 
 ---
 
@@ -183,7 +187,7 @@ A **trial** is a single API call to a model. By default, SkillEval runs 5 trials
 
 ### Comparator
 
-A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 6 comparators (see [Comparators](#18-comparators)).
+A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 6 comparators (see [Comparators](#21-comparators)).
 
 ### Modes
 
@@ -217,7 +221,7 @@ my-extraction-task/
 
 ### Preparing Input Files
 
-Place the files your model will process in the `input/` directory. SkillEval supports many formats (see [Supported Input Files](#17-supported-input-files)). All input files are concatenated and sent as part of the prompt.
+Place the files your model will process in the `input/` directory. SkillEval supports many formats (see [Supported Input Files](#20-supported-input-files)). All input files are concatenated and sent as part of the prompt.
 
 Input files are formatted for the LLM as:
 
@@ -595,7 +599,136 @@ The report uses a dark theme designed for readability. It is fully responsive an
 
 ---
 
-## 14. CLI Reference
+## 14. Interactive TUI Mode
+
+**Command:** `skilleval` (no arguments)
+
+When you run `skilleval` with no arguments, it launches an interactive Terminal User Interface (TUI) with slash-command navigation and tab completion.
+
+### How to Launch
+
+```bash
+skilleval
+```
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/run` | Start a Mode 1 evaluation (prompts for task path, models, trials) |
+| `/matrix` | Start a Mode 2 matrix evaluation |
+| `/chain` | Start a Mode 3 chain evaluation |
+| `/catalog` | Display available models with status |
+| `/init` | Create a new task folder (prompts for name) |
+| `/report` | Re-render results from a previous run |
+| `/history` | View past runs for a task |
+| `/lint` | Validate a Claude Code skill structure |
+| `/compare` | Compare two evaluation runs |
+| `/language` | Toggle between English and Chinese |
+| `/help` | Show all available commands |
+| `/quit` | Exit the TUI |
+
+### Tab Completion
+
+Type `/` and press `Tab` to see all available commands. The TUI supports partial matching — type the first few characters and press `Tab` to autocomplete.
+
+### Example Session
+
+```
+SkillEval Interactive Mode
+Type /help for available commands.
+
+skilleval> /catalog
+┌──────────────────┬──────────┬─────────┐
+│ Model            │ Provider │ Status  │
+├──────────────────┼──────────┼─────────┤
+│ qwen-turbo       │ Qwen     │ Ready   │
+│ glm-4.5-flash    │ GLM      │ Ready   │
+│ ...              │ ...      │ ...     │
+└──────────────────┴──────────┴─────────┘
+
+skilleval> /run
+Task path: sample-tasks/invoice-extraction
+Models (comma-separated, or Enter for all):
+Trials (Enter for default):
+Running evaluation...
+```
+
+---
+
+## 15. Run History
+
+**Command:** `skilleval history <task_path>`
+
+Lists all past evaluation runs for a task, showing metadata from each run directory.
+
+### Example
+
+```bash
+skilleval history sample-tasks/invoice-extraction
+skilleval history my-task --json
+```
+
+### Output
+
+Displays a table with columns:
+
+| Column | Description |
+|--------|-------------|
+| Run | Directory name (e.g., `run-20260227-143052`) with `[LATEST]` marker |
+| Mode | Evaluation mode (`run`, `matrix`, or `chain`) |
+| Models | Number of models evaluated |
+| Avg Pass Rate | Average pass rate across all models (color-coded) |
+| Recommendation | The recommended model (truncated to 50 characters) |
+
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output history as JSON for scripting |
+
+---
+
+## 16. Internationalization
+
+SkillEval supports English and Simplified Chinese throughout the CLI and TUI.
+
+### Setting the Language
+
+There are three ways to set the language, checked in this order:
+
+**1. Environment variable (highest priority):**
+
+```bash
+export SKILLEVAL_LANG=zh
+skilleval run my-task
+```
+
+**2. Settings file:**
+
+```bash
+# Create or edit ~/.config/skilleval/settings.yaml
+echo "language: zh" > ~/.config/skilleval/settings.yaml
+```
+
+**3. OS locale detection (automatic fallback):**
+
+If your system locale starts with `zh` (e.g., `zh_CN`, `zh_TW`), SkillEval defaults to Chinese. Otherwise, it defaults to English.
+
+### Toggling in the TUI
+
+In the interactive TUI, type `/language` to toggle between English and Chinese. The preference is saved to `~/.config/skilleval/settings.yaml` and persists across sessions.
+
+### Supported Languages
+
+| Code | Language |
+|------|----------|
+| `en` | English (default) |
+| `zh` | Simplified Chinese |
+
+---
+
+## 17. CLI Reference
 
 ### `skilleval`
 
@@ -613,6 +746,7 @@ Commands:
   catalog     Display model catalog with availability status.
   chain       Mode 3: Meta-skill x creator x executor chain evaluation.
   compare     Compare results from two runs.
+  history     List past evaluation runs for a task.
   init        Create a new task folder with template files.
   lint        Validate a Claude Code skill structure.
   matrix      Mode 2: Creator x executor matrix evaluation.
@@ -620,6 +754,8 @@ Commands:
   run         Mode 1: Evaluate models with a given skill.
   skill-test  Test a Claude Code skill against test cases.
 ```
+
+When run with no arguments, SkillEval launches the [Interactive TUI](#14-interactive-tui-mode).
 
 ### `skilleval init`
 
@@ -638,10 +774,14 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--trials` | No | From config | Override trial count |
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--resume` | No | — | Path to a previous run directory to resume from |
+| `--output` | No | `rich` | Output format: `rich` (table), `json`, or `csv` |
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--json` | No | `false` | Output results as JSON (for piping) |
+| `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
+
+**Resuming a run:** Pass `--resume <run_dir>` to skip models that completed in a previous run. SkillEval reads `checkpoint.json` from the given directory and skips any models listed in `completed_models`.
 
 ### `skilleval matrix`
 
@@ -653,10 +793,11 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--trials` | No | From config | Override trial count |
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
+| `--output` | No | `rich` | Output format: `rich` (table), `json`, or `csv` |
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--json` | No | `false` | Output results as JSON (for piping) |
+| `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval chain`
 
@@ -670,10 +811,11 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--parallel` | No | `20` | Max concurrent API calls |
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
 | `--yes` / `-y` | No | `false` | Skip confirmation for large runs (>100 API calls) |
+| `--output` | No | `rich` | Output format: `rich` (table), `json`, or `csv` |
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--json` | No | `false` | Output results as JSON (for piping) |
+| `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval catalog`
 
@@ -681,6 +823,15 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 |--------|----------|---------|-------------|
 | `--catalog` | No | Auto-detect | Path to model catalog YAML |
 | `--json` | No | `false` | Output catalog as JSON |
+
+### `skilleval history`
+
+| Argument/Option | Required | Default | Description |
+|-----------------|----------|---------|-------------|
+| `TASK_PATH` | Yes | — | Path to task folder |
+| `--json` | No | `false` | Output history as JSON |
+
+Lists all past runs in the task's `.skilleval/` directory, sorted newest-first. The most recent run is marked `[LATEST]`.
 
 ### `skilleval report`
 
@@ -726,7 +877,7 @@ Shows a diff table of pass rate changes between two runs.
 
 ---
 
-## 15. Configuration
+## 18. Configuration
 
 Each task folder contains a `config.yaml` file that controls evaluation behavior.
 
@@ -776,11 +927,11 @@ output_format: json
 | `file_hash` | Byte-identical SHA-256 comparison |
 | `custom` | Run a user-provided script (requires `custom_script`) |
 
-See [Comparators](#18-comparators) for detailed descriptions.
+See [Comparators](#21-comparators) for detailed descriptions.
 
 ---
 
-## 16. Model Catalog
+## 19. Model Catalog
 
 ### Default Models
 
@@ -858,7 +1009,7 @@ Only models whose `env_key` variable is set in the environment are considered "a
 
 ---
 
-## 17. Supported Input Files
+## 20. Supported Input Files
 
 SkillEval extracts text from input files and formats them for the LLM. The following file types are supported:
 
@@ -908,7 +1059,7 @@ RuntimeError: PDF extraction requires pdfplumber. Install with:
 
 ---
 
-## 18. Comparators
+## 21. Comparators
 
 Comparators determine how SkillEval checks whether a model's output matches the expected result. All comparators return a (passed, diff) tuple where `diff` is `None` on success or a descriptive error string on failure.
 
@@ -1055,7 +1206,7 @@ sys.exit(0)
 
 ---
 
-## 19. Results & Output
+## 22. Results & Output
 
 ### Output Directory
 
@@ -1064,6 +1215,34 @@ Each run creates a timestamped directory under `.skilleval/` in the task folder:
 ```
 my-task/.skilleval/run-20260227-143052/
 ```
+
+After each run, SkillEval also creates (or updates) a `latest` symlink:
+
+```
+my-task/.skilleval/latest -> run-20260227-143052
+```
+
+This lets you reference the most recent run without knowing the exact timestamp:
+
+```bash
+skilleval report my-task/.skilleval/latest
+```
+
+### `run-config.json`
+
+Each run directory also contains a lightweight `run-config.json` file with metadata about how the run was produced:
+
+```json
+{
+  "mode": "run",
+  "task": "my-task",
+  "timestamp": "2026-02-27T14:30:52",
+  "models": ["qwen-turbo", "glm-4.5-flash"],
+  "trials": 5
+}
+```
+
+This file is used by the `history` command to quickly load run metadata without parsing the full `results.json`.
 
 ### Directory Structure
 
@@ -1074,6 +1253,7 @@ The structure varies by mode:
 ```
 run-20260227-143052/
 ├── results.json                     # Machine-readable results
+├── run-config.json                  # Lightweight run metadata
 ├── summary.txt                      # Human-readable summary
 └── trials/
     ├── qwen-turbo/
@@ -1122,7 +1302,9 @@ run-20260227-143052/
 
 ### `results.json`
 
-The `results.json` file contains the complete `RunSummary` as JSON. Key fields:
+The `results.json` file contains the complete `RunSummary` as JSON. Note that `output_text` is excluded from `results.json` to reduce file size — the raw output is already stored in per-trial `output.txt` files.
+
+Key fields:
 
 ```json
 {
@@ -1141,7 +1323,6 @@ The `results.json` file contains the complete `RunSummary` as JSON. Key fields:
           "model": "qwen-turbo",
           "trial_number": 1,
           "passed": true,
-          "output_text": "{...}",
           "diff": null,
           "input_tokens": 850,
           "output_tokens": 320,
@@ -1181,9 +1362,221 @@ skilleval report my-task/.skilleval/run-20260227-143052
 skilleval report my-task/.skilleval/run-20260227-143052/results.json
 ```
 
+### Output Formats
+
+Use `--output` to control how results are displayed:
+
+```bash
+# Rich table (default)
+skilleval run my-task
+
+# JSON for scripting
+skilleval run my-task --output json | jq '.recommendation'
+
+# CSV for spreadsheets
+skilleval run my-task --output csv > results.csv
+```
+
+CSV columns by mode:
+- **Mode 1:** `model, pass_rate, avg_cost, avg_latency, total_cost`
+- **Mode 2:** `creator, executor, pass_rate, avg_cost, total_cost`
+- **Mode 3:** `meta_skill, creator, executor, pass_rate, avg_cost, total_cost`
+
 ---
 
-## 20. Sample Walkthrough
+## 23. Test Case Walkthrough
+
+This section provides a complete, self-contained test case you can create from scratch to verify your SkillEval setup and understand the evaluation workflow.
+
+### The Task: Email Contact Extraction
+
+We'll build a task that extracts contact information from a plain-text email into structured JSON.
+
+### Step 1: Create the Task Folder
+
+```bash
+skilleval init email-extraction
+```
+
+### Step 2: Write the Input
+
+Replace `email-extraction/input/example.txt` with:
+
+```
+email-extraction/input/email.txt
+```
+
+```text
+From: David Park <david.park@novacorp.io>
+To: support@acmewidgets.com
+Date: March 1, 2026
+Subject: Partnership Inquiry
+
+Hi Team,
+
+I'm the Head of Business Development at NovaCorp Industries.
+We're interested in exploring a partnership for your
+enterprise widget platform.
+
+Could we schedule a call next week? My direct line is
++1 (415) 555-0192 and I'm available Tuesday or Thursday
+between 10am and 3pm PST.
+
+Best regards,
+David Park
+Head of Business Development
+NovaCorp Industries
+500 Market Street, Suite 1200
+San Francisco, CA 94105
+```
+
+### Step 3: Define the Expected Output
+
+Create `email-extraction/expected/result.json`:
+
+```json
+{
+  "sender_name": "David Park",
+  "sender_email": "david.park@novacorp.io",
+  "sender_title": "Head of Business Development",
+  "sender_company": "NovaCorp Industries",
+  "sender_phone": "+1 (415) 555-0192",
+  "sender_address": "500 Market Street, Suite 1200, San Francisco, CA 94105",
+  "recipient_email": "support@acmewidgets.com",
+  "date": "2026-03-01",
+  "subject": "Partnership Inquiry"
+}
+```
+
+### Step 4: Write the Skill
+
+Replace `email-extraction/skill.md` with:
+
+```markdown
+You are an email contact extraction system. Extract structured contact
+information from the email provided and return ONLY valid JSON with no
+additional text.
+
+## Output Schema
+
+Return a JSON object with exactly these fields:
+
+- `sender_name` (string): Full name of the email sender
+- `sender_email` (string): Email address of the sender
+- `sender_title` (string): Job title of the sender
+- `sender_company` (string): Company name of the sender
+- `sender_phone` (string): Phone number exactly as written
+- `sender_address` (string): Full mailing address on a single line,
+  comma-separated
+- `recipient_email` (string): Email address of the recipient
+- `date` (string): Email date in YYYY-MM-DD format
+- `subject` (string): Email subject line
+
+## Rules
+
+- Return ONLY the JSON object. No markdown fences, no explanation.
+- Dates must be in YYYY-MM-DD format.
+- The address should combine street, suite, city, state, and ZIP into
+  one comma-separated string.
+- Phone numbers should be kept in their original format.
+```
+
+### Step 5: Configure the Task
+
+Replace `email-extraction/config.yaml` with:
+
+```yaml
+comparator: json_exact
+trials: 3
+timeout: 60
+temperature: 0
+max_tokens: 1024
+output_format: json
+```
+
+### Step 6: Verify the Task Structure
+
+Your task folder should now look like:
+
+```
+email-extraction/
+├── config.yaml
+├── skill.md
+├── prompt.md              # Template from init (unused in Mode 1)
+├── meta-skill.md          # Template from init (unused in Mode 1)
+├── input/
+│   ├── example.txt        # Template from init (can delete)
+│   └── email.txt          # Your input
+└── expected/
+    ├── example.txt        # Template from init (can delete)
+    └── result.json        # Your expected output
+```
+
+> **Tip:** Delete the template `example.txt` files from `input/` and `expected/` so only your actual test files remain. SkillEval concatenates all files in `input/`, so extra files will add noise to the prompt.
+
+### Step 7: Run the Evaluation
+
+```bash
+# Run against all available models
+skilleval run email-extraction
+
+# Or target specific models
+skilleval run email-extraction --models qwen-turbo,glm-4.5-flash --trials 5
+```
+
+### Step 8: Check Results
+
+```bash
+# View run history
+skilleval history email-extraction
+
+# Re-render the latest run
+skilleval report email-extraction/.skilleval/latest
+
+# Export as CSV
+skilleval report email-extraction/.skilleval/latest --output csv
+```
+
+### Step 9: Investigate Failures
+
+If a model doesn't achieve 100%, inspect the diff:
+
+```bash
+cat email-extraction/.skilleval/latest/qwen-turbo/trial-1/diff.txt
+```
+
+Common failure modes for this task:
+- **Date format:** Model returns "March 1, 2026" instead of "2026-03-01"
+- **Address format:** Different comma placement or missing suite number
+- **Phone format:** Model normalizes to a different format
+
+### Step 10: Iterate on the Skill
+
+If failures are consistent, improve `skill.md`:
+- Add explicit examples of the expected date format
+- Show a sample address transformation
+- Add constraints about phone number preservation
+
+Then re-run and compare:
+
+```bash
+skilleval run email-extraction
+skilleval compare \
+  email-extraction/.skilleval/run-<old-timestamp> \
+  email-extraction/.skilleval/latest
+```
+
+### Why This Test Case Works
+
+This task is a good validation because:
+- **Deterministic:** There is exactly one correct answer
+- **Non-trivial:** Requires date parsing, address assembly, and field mapping
+- **Diverse fields:** Tests string extraction, formatting, and structured output
+- **Cheap to run:** Small input keeps token usage (and cost) minimal
+
+---
+
+## 24. Sample Walkthrough
 
 This walkthrough uses the bundled `invoice-extraction` task to demonstrate an end-to-end Mode 1 evaluation.
 
@@ -1279,7 +1672,7 @@ Then re-run the evaluation.
 
 ---
 
-## 21. Troubleshooting / FAQ
+## 25. Troubleshooting / FAQ
 
 ### "No models available"
 
