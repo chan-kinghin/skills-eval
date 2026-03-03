@@ -36,8 +36,7 @@ def _validate_config(raw: dict, config_path: Path) -> TaskConfig:
     if config.comparator not in COMPARATORS:
         available = ", ".join(sorted(COMPARATORS))
         raise ValueError(
-            f"Unknown comparator '{config.comparator}' in {config_path}. "
-            f"Available: {available}"
+            f"Unknown comparator '{config.comparator}' in {config_path}. Available: {available}"
         )
 
     return config
@@ -63,7 +62,9 @@ def load_task(task_path: str | Path) -> TaskFolder:
     if not expected_dir.exists():
         raise ValueError(f"expected/ directory missing or empty in {task_path}")
 
-    input_files = sorted(p for p in input_dir.iterdir() if p.is_file() and not p.name.startswith("."))
+    input_files = sorted(
+        p for p in input_dir.iterdir() if p.is_file() and not p.name.startswith(".")
+    )
     expected_files = sorted(
         p for p in expected_dir.iterdir() if p.is_file() and not p.name.startswith(".")
     )
@@ -129,10 +130,12 @@ def _load_catalog_text(catalog_path: str | Path | None) -> str:
     if catalog_path:
         candidates.append(Path(catalog_path))
 
-    candidates.extend([
-        Path.cwd() / "models.yaml",
-        Path.home() / ".config" / "skilleval" / "models.yaml",
-    ])
+    candidates.extend(
+        [
+            Path.cwd() / "models.yaml",
+            Path.home() / ".config" / "skilleval" / "models.yaml",
+        ]
+    )
 
     for path in candidates:
         if path.exists():

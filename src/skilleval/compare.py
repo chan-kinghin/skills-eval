@@ -38,23 +38,27 @@ def _load_summary(path: Path) -> RunSummary:
 
 
 def _pairs_from_run(summary: RunSummary) -> dict[str, tuple[float, float, float]]:
-    return {
-        mr.model: (mr.pass_rate, mr.avg_cost, mr.avg_latency) for mr in summary.model_results
-    }
+    return {mr.model: (mr.pass_rate, mr.avg_cost, mr.avg_latency) for mr in summary.model_results}
 
 
 def _pairs_from_matrix(summary: RunSummary) -> dict[str, tuple[float, float, float]]:
     def label(cell: MatrixCell) -> str:
         return f"{cell.creator} -> {cell.executor}"
 
-    return {label(c): (c.result.pass_rate, c.result.avg_cost, c.result.avg_latency) for c in summary.matrix_results}
+    return {
+        label(c): (c.result.pass_rate, c.result.avg_cost, c.result.avg_latency)
+        for c in summary.matrix_results
+    }
 
 
 def _pairs_from_chain(summary: RunSummary) -> dict[str, tuple[float, float, float]]:
     def label(cell: ChainCell) -> str:
         return f"{cell.meta_skill_name} / {cell.creator} -> {cell.executor}"
 
-    return {label(c): (c.result.pass_rate, c.result.avg_cost, c.result.avg_latency) for c in summary.chain_results}
+    return {
+        label(c): (c.result.pass_rate, c.result.avg_cost, c.result.avg_latency)
+        for c in summary.chain_results
+    }
 
 
 def _classify(old: float, new: float, eps: float = 1e-9) -> str:
@@ -163,4 +167,3 @@ def compare_runs(old_path: Path, new_path: Path) -> ComparisonReport:
         entries=entries,
         summary=summary,
     )
-

@@ -52,8 +52,12 @@ class TestParseResponse:
     @pytest.fixture()
     def model(self) -> ModelEntry:
         return ModelEntry(
-            name="m", provider="p", endpoint="http://x",
-            input_cost_per_m=0, output_cost_per_m=0, env_key="K",
+            name="m",
+            provider="p",
+            endpoint="http://x",
+            input_cost_per_m=0,
+            output_cost_per_m=0,
+            env_key="K",
         )
 
     def test_standard_response(self, model: ModelEntry):
@@ -124,9 +128,7 @@ class TestParseResponse:
 
     def test_missing_usage(self, model: ModelEntry):
         data = {
-            "choices": [
-                {"message": {"content": "hi"}, "finish_reason": "stop"}
-            ],
+            "choices": [{"message": {"content": "hi"}, "finish_reason": "stop"}],
         }
         resp = ModelClient._parse_response(data, latency=0.1, model=model)
         assert resp.input_tokens == 0
@@ -134,9 +136,7 @@ class TestParseResponse:
 
     def test_none_content_treated_as_empty(self, model: ModelEntry):
         data = {
-            "choices": [
-                {"message": {"content": None}, "finish_reason": "stop"}
-            ],
+            "choices": [{"message": {"content": None}, "finish_reason": "stop"}],
             "usage": {"prompt_tokens": 1, "completion_tokens": 1},
         }
         resp = ModelClient._parse_response(data, latency=0.1, model=model)

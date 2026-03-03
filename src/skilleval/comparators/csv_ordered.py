@@ -33,17 +33,12 @@ class CsvOrderedComparator(FileComparator):
 
         if len(expected_rows) != len(output_rows):
             return False, (
-                f"Row count mismatch: expected {len(expected_rows)}, "
-                f"got {len(output_rows)}"
+                f"Row count mismatch: expected {len(expected_rows)}, got {len(output_rows)}"
             )
 
         for i, (exp_row, out_row) in enumerate(zip(expected_rows, output_rows)):
             if exp_row != out_row:
-                return False, (
-                    f"Row {i} differs:\n"
-                    f"  expected: {exp_row}\n"
-                    f"  got:      {out_row}"
-                )
+                return False, (f"Row {i} differs:\n  expected: {exp_row}\n  got:      {out_row}")
 
         return True, ""
 

@@ -70,10 +70,12 @@ class JsonExactComparator(FileComparator):
         if expected_canonical == output_canonical:
             return True, ""
 
-        diff_lines = list(difflib.unified_diff(
-            expected_canonical.splitlines(keepends=True),
-            output_canonical.splitlines(keepends=True),
-            fromfile="expected",
-            tofile="output",
-        ))
+        diff_lines = list(
+            difflib.unified_diff(
+                expected_canonical.splitlines(keepends=True),
+                output_canonical.splitlines(keepends=True),
+                fromfile="expected",
+                tofile="output",
+            )
+        )
         return False, "".join(diff_lines)

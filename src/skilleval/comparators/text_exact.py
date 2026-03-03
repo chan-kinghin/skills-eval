@@ -35,12 +35,14 @@ class TextExactComparator(FileComparator):
         if expected_norm == output_norm:
             return True, ""
 
-        diff_lines = list(difflib.unified_diff(
-            expected_norm.splitlines(keepends=True),
-            output_norm.splitlines(keepends=True),
-            fromfile="expected",
-            tofile="output",
-        ))
+        diff_lines = list(
+            difflib.unified_diff(
+                expected_norm.splitlines(keepends=True),
+                output_norm.splitlines(keepends=True),
+                fromfile="expected",
+                tofile="output",
+            )
+        )
         return False, "".join(diff_lines)
 
     @staticmethod

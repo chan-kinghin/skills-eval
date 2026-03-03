@@ -57,8 +57,12 @@ def _aggregate_trials(model_name: str, trials: list[TrialResult]) -> ModelResult
     """Aggregate individual trials into a ModelResult."""
     if not trials:
         return ModelResult(
-            model=model_name, pass_rate=0.0, trials=[], avg_cost=0.0,
-            avg_latency=0.0, total_cost=0.0,
+            model=model_name,
+            pass_rate=0.0,
+            trials=[],
+            avg_cost=0.0,
+            avg_latency=0.0,
+            total_cost=0.0,
         )
 
     passed = sum(1 for t in trials if t.passed)
@@ -156,7 +160,8 @@ async def run_mode1(
 
     logger.info(
         "Mode 1 starting: %d models, %d trials each",
-        len(models), task.config.trials,
+        len(models),
+        task.config.trials,
     )
 
     writer = ResultWriter(task.path, "run")
@@ -166,15 +171,17 @@ async def run_mode1(
     specs: list[TrialSpec] = []
     for model in models:
         for trial_num in range(1, task.config.trials + 1):
-            specs.append(TrialSpec(
-                model=model,
-                messages=[
-                    {"role": "system", "content": task.skill},
-                    {"role": "user", "content": user_content},
-                ],
-                config=task.config,
-                trial_number=trial_num,
-            ))
+            specs.append(
+                TrialSpec(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": task.skill},
+                        {"role": "user", "content": user_content},
+                    ],
+                    config=task.config,
+                    trial_number=trial_num,
+                )
+            )
 
     results, interrupted = await _execute_with_progress(engine, specs)
 
@@ -185,7 +192,10 @@ async def run_mode1(
             passed, diff = False, trial.error
         else:
             passed, diff = await asyncio.to_thread(
-                _save_and_compare, task, trial.output_text, comparator_kwargs,
+                _save_and_compare,
+                task,
+                trial.output_text,
+                comparator_kwargs,
             )
         trial.passed = passed
         trial.diff = diff
@@ -216,7 +226,9 @@ async def run_mode1(
     logger.info(
         "Mode 1 %s: %d/%d trials passed across %d models",
         "interrupted" if interrupted else "complete",
-        total_passed, len(results), len(model_results),
+        total_passed,
+        len(results),
+        len(model_results),
     )
 
     summary = RunSummary(
@@ -245,7 +257,9 @@ async def run_mode2(
 
     logger.info(
         "Mode 2 starting: %d creators, %d executors, %d trials",
-        len(creators), len(executors), task.config.trials,
+        len(creators),
+        len(executors),
+        task.config.trials,
     )
 
     writer = ResultWriter(task.path, "matrix")
@@ -257,23 +271,29 @@ async def run_mode2(
     console.print("[bold]Phase 1:[/bold] Generating skills...")
     creator_specs: list[TrialSpec] = []
     for creator in creators:
-        creator_specs.append(TrialSpec(
-            model=creator,
-            messages=[{
-                "role": "user",
-                "content": (
-                    "Write a task skill based on this description:\n\n"
-                    + task.prompt
-                    + "\n\nInput files the executor will receive:\n"
-                    + input_desc
-                ),
-            }],
-            config=task.config,
-            trial_number=1,
-        ))
+        creator_specs.append(
+            TrialSpec(
+                model=creator,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": (
+                            "Write a task skill based on this description:\n\n"
+                            + task.prompt
+                            + "\n\nInput files the executor will receive:\n"
+                            + input_desc
+                        ),
+                    }
+                ],
+                config=task.config,
+                trial_number=1,
+            )
+        )
 
     skill_results, interrupted = await _execute_with_progress(
-        engine, creator_specs, "Generating skills...",
+        engine,
+        creator_specs,
+        "Generating skills...",
     )
 
     generated_skills: dict[str, str] = {}
@@ -302,19 +322,22 @@ async def run_mode2(
                 continue
             for executor in executors:
                 for trial_num in range(1, task.config.trials + 1):
-                    exec_specs.append(TrialSpec(
-                        model=executor,
-                        messages=[
-                            {"role": "system", "content": skill_text},
-                            {"role": "user", "content": user_content},
-                        ],
-                        config=task.config,
-                        trial_number=trial_num,
-                    ))
+                    exec_specs.append(
+                        TrialSpec(
+                            model=executor,
+                            messages=[
+                                {"role": "system", "content": skill_text},
+                                {"role": "user", "content": user_content},
+                            ],
+                            config=task.config,
+                            trial_number=trial_num,
+                        )
+                    )
                     spec_keys.append((creator.name, executor.name))
 
         exec_results, exec_interrupted = await _execute_with_progress(
-            engine, exec_specs,
+            engine,
+            exec_specs,
         )
         interrupted = interrupted or exec_interrupted
 
@@ -326,7 +349,10 @@ async def run_mode2(
             passed, diff = False, trial.error
         else:
             passed, diff = await asyncio.to_thread(
-                _save_and_compare, task, trial.output_text, comparator_kwargs,
+                _save_and_compare,
+                task,
+                trial.output_text,
+                comparator_kwargs,
             )
         trial.passed = passed
         trial.diff = diff
@@ -352,23 +378,25 @@ async def run_mode2(
     matrix_results: list[MatrixCell] = []
     for (cr_name, ex_name), trials in pair_trials.items():
         model_result = _aggregate_trials(ex_name, trials)
-        matrix_results.append(MatrixCell(
-            creator=cr_name,
-            executor=ex_name,
-            generated_skill=generated_skills[cr_name],
-            result=model_result,
-        ))
+        matrix_results.append(
+            MatrixCell(
+                creator=cr_name,
+                executor=ex_name,
+                generated_skill=generated_skills[cr_name],
+                result=model_result,
+            )
+        )
 
-    candidates = [
-        (f"{c.creator} -> {c.executor}", c.result) for c in matrix_results
-    ]
+    candidates = [(f"{c.creator} -> {c.executor}", c.result) for c in matrix_results]
     recommendation = _compute_recommendation(candidates, task.config.trials)
 
     total_passed = sum(1 for t in exec_results if t.passed)
     logger.info(
         "Mode 2 %s: %d/%d trials passed across %d pairs",
         "interrupted" if interrupted else "complete",
-        total_passed, len(exec_results), len(matrix_results),
+        total_passed,
+        len(exec_results),
+        len(matrix_results),
     )
 
     summary = RunSummary(
@@ -398,7 +426,10 @@ async def run_mode3(
 
     logger.info(
         "Mode 3 starting: %d meta-skills, %d creators, %d executors, %d trials",
-        len(meta_skill_names), len(creators), len(executors), task.config.trials,
+        len(meta_skill_names),
+        len(creators),
+        len(executors),
+        task.config.trials,
     )
 
     writer = ResultWriter(task.path, "chain")
@@ -410,9 +441,7 @@ async def run_mode3(
     for ms_name in meta_skill_names:
         if ms_name not in task.meta_skills:
             available = ", ".join(sorted(task.meta_skills.keys())) if task.meta_skills else "none"
-            raise ValueError(
-                f"Meta-skill '{ms_name}' not found. Available: {available}"
-            )
+            raise ValueError(f"Meta-skill '{ms_name}' not found. Available: {available}")
 
     # Phase 1: Skill Generation
     interrupted = False
@@ -423,27 +452,31 @@ async def run_mode3(
     for ms_name in meta_skill_names:
         ms_content = task.meta_skills[ms_name]
         for creator in creators:
-            gen_specs.append(TrialSpec(
-                model=creator,
-                messages=[
-                    {"role": "system", "content": ms_content},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Write a task skill for this task:\n\n"
-                            + task.prompt
-                            + "\n\nInput files:\n"
-                            + input_desc
-                        ),
-                    },
-                ],
-                config=task.config,
-                trial_number=1,
-            ))
+            gen_specs.append(
+                TrialSpec(
+                    model=creator,
+                    messages=[
+                        {"role": "system", "content": ms_content},
+                        {
+                            "role": "user",
+                            "content": (
+                                "Write a task skill for this task:\n\n"
+                                + task.prompt
+                                + "\n\nInput files:\n"
+                                + input_desc
+                            ),
+                        },
+                    ],
+                    config=task.config,
+                    trial_number=1,
+                )
+            )
             gen_keys.append((ms_name, creator.name))
 
     gen_results, interrupted = await _execute_with_progress(
-        engine, gen_specs, "Generating skills...",
+        engine,
+        gen_specs,
+        "Generating skills...",
     )
 
     generated_skills: dict[tuple[str, str], str] = {}
@@ -475,19 +508,22 @@ async def run_mode3(
                     continue
                 for executor in executors:
                     for trial_num in range(1, task.config.trials + 1):
-                        exec_specs.append(TrialSpec(
-                            model=executor,
-                            messages=[
-                                {"role": "system", "content": skill_text},
-                                {"role": "user", "content": user_content},
-                            ],
-                            config=task.config,
-                            trial_number=trial_num,
-                        ))
+                        exec_specs.append(
+                            TrialSpec(
+                                model=executor,
+                                messages=[
+                                    {"role": "system", "content": skill_text},
+                                    {"role": "user", "content": user_content},
+                                ],
+                                config=task.config,
+                                trial_number=trial_num,
+                            )
+                        )
                         exec_keys.append((ms_name, creator.name, executor.name))
 
         exec_results, exec_interrupted = await _execute_with_progress(
-            engine, exec_specs,
+            engine,
+            exec_specs,
         )
         interrupted = interrupted or exec_interrupted
 
@@ -499,7 +535,10 @@ async def run_mode3(
             passed, diff = False, trial.error
         else:
             passed, diff = await asyncio.to_thread(
-                _save_and_compare, task, trial.output_text, comparator_kwargs,
+                _save_and_compare,
+                task,
+                trial.output_text,
+                comparator_kwargs,
             )
         trial.passed = passed
         trial.diff = diff
@@ -526,17 +565,18 @@ async def run_mode3(
     chain_results: list[ChainCell] = []
     for (ms_name, cr_name, ex_name), trials in chain_trials.items():
         model_result = _aggregate_trials(ex_name, trials)
-        chain_results.append(ChainCell(
-            meta_skill_name=ms_name,
-            creator=cr_name,
-            executor=ex_name,
-            generated_skill=generated_skills.get((ms_name, cr_name), ""),
-            result=model_result,
-        ))
+        chain_results.append(
+            ChainCell(
+                meta_skill_name=ms_name,
+                creator=cr_name,
+                executor=ex_name,
+                generated_skill=generated_skills.get((ms_name, cr_name), ""),
+                result=model_result,
+            )
+        )
 
     candidates = [
-        (f"{c.meta_skill_name} / {c.creator} -> {c.executor}", c.result)
-        for c in chain_results
+        (f"{c.meta_skill_name} / {c.creator} -> {c.executor}", c.result) for c in chain_results
     ]
     recommendation = _compute_recommendation(candidates, task.config.trials)
 
@@ -544,7 +584,9 @@ async def run_mode3(
     logger.info(
         "Mode 3 %s: %d/%d trials passed across %d chains",
         "interrupted" if interrupted else "complete",
-        total_passed, len(exec_results), len(chain_results),
+        total_passed,
+        len(exec_results),
+        len(chain_results),
     )
 
     summary = RunSummary(

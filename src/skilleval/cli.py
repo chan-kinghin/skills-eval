@@ -80,8 +80,15 @@ def _write_run_csv(results: list[ModelResult]) -> str:
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(["model", "pass_rate", "avg_cost", "avg_latency", "total_cost"])
     for r in sorted(results, key=lambda x: (-x.pass_rate, x.avg_cost)):
-        writer.writerow([r.model, f"{r.pass_rate:.4f}", f"{r.avg_cost:.6f}",
-                         f"{r.avg_latency:.2f}", f"{r.total_cost:.6f}"])
+        writer.writerow(
+            [
+                r.model,
+                f"{r.pass_rate:.4f}",
+                f"{r.avg_cost:.6f}",
+                f"{r.avg_latency:.2f}",
+                f"{r.total_cost:.6f}",
+            ]
+        )
     return buf.getvalue()
 
 
@@ -91,8 +98,15 @@ def _write_matrix_csv(cells: list) -> str:
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(["creator", "executor", "pass_rate", "avg_cost", "total_cost"])
     for c in cells:
-        writer.writerow([c.creator, c.executor, f"{c.result.pass_rate:.4f}",
-                         f"{c.result.avg_cost:.6f}", f"{c.result.total_cost:.6f}"])
+        writer.writerow(
+            [
+                c.creator,
+                c.executor,
+                f"{c.result.pass_rate:.4f}",
+                f"{c.result.avg_cost:.6f}",
+                f"{c.result.total_cost:.6f}",
+            ]
+        )
     return buf.getvalue()
 
 
@@ -102,9 +116,16 @@ def _write_chain_csv(cells: list) -> str:
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(["meta_skill", "creator", "executor", "pass_rate", "avg_cost", "total_cost"])
     for c in cells:
-        writer.writerow([c.meta_skill_name, c.creator, c.executor,
-                         f"{c.result.pass_rate:.4f}", f"{c.result.avg_cost:.6f}",
-                         f"{c.result.total_cost:.6f}"])
+        writer.writerow(
+            [
+                c.meta_skill_name,
+                c.creator,
+                c.executor,
+                f"{c.result.pass_rate:.4f}",
+                f"{c.result.avg_cost:.6f}",
+                f"{c.result.total_cost:.6f}",
+            ]
+        )
     return buf.getvalue()
 
 
@@ -254,8 +275,10 @@ def init(name: str) -> None:
     console.print(f"  4. Edit [cyan]{task_path}/config.yaml[/cyan] as needed")
     console.print(f"  5. Run: [bold]skilleval run {task_path}[/bold]")
     console.print()
-    console.print("[dim]Available comparators: json_exact, csv_ordered, csv_unordered, "
-                  "field_subset, file_hash, custom[/dim]")
+    console.print(
+        "[dim]Available comparators: json_exact, csv_ordered, csv_unordered, "
+        "field_subset, file_hash, custom[/dim]"
+    )
     console.print("[dim]Check available models: skilleval catalog[/dim]")
 
 
@@ -271,11 +294,17 @@ def init(name: str) -> None:
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
-              help="Output format (default: rich)")
+@click.option(
+    "--output",
+    "output_fmt",
+    type=click.Choice(["rich", "json", "csv"]),
+    default=None,
+    help="Output format (default: rich)",
+)
 @click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
-@click.option("--resume", "resume_dir", default=None,
-              help="Resume a previous run from a checkpoint directory")
+@click.option(
+    "--resume", "resume_dir", default=None, help="Resume a previous run from a checkpoint directory"
+)
 def run(
     task_path: str,
     models: str | None,
@@ -383,8 +412,13 @@ async def _run_mode1(task, selected, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
-              help="Output format (default: rich)")
+@click.option(
+    "--output",
+    "output_fmt",
+    type=click.Choice(["rich", "json", "csv"]),
+    default=None,
+    help="Output format (default: rich)",
+)
 @click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
 def matrix(
     task_path: str,
@@ -416,7 +450,9 @@ def matrix(
         creator_models = filter_by_names(catalog, creators.split(","))
         executor_models = filter_by_names(catalog, executors.split(","))
 
-        num_calls = len(creator_models) + len(creator_models) * len(executor_models) * task.config.trials
+        num_calls = (
+            len(creator_models) + len(creator_models) * len(executor_models) * task.config.trials
+        )
         all_models = creator_models + executor_models
         avg_input_cost = sum(m.input_cost_per_m for m in all_models) / len(all_models)
         avg_output_cost = sum(m.output_cost_per_m for m in all_models) / len(all_models)
@@ -440,7 +476,9 @@ def matrix(
         else:
             display_matrix_results(summary.matrix_results)
             if summary.recommendation:
-                console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
+                console.print(
+                    f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}"
+                )
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -470,8 +508,13 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
 @click.option("--endpoint", default=None, help="Ad-hoc OpenAI-compatible endpoint URL")
 @click.option("--api-key", "api_key", default=None, help="API key for ad-hoc endpoint")
 @click.option("--model-name", "model_name", default=None, help="Model name for ad-hoc endpoint")
-@click.option("--output", "output_fmt", type=click.Choice(["rich", "json", "csv"]), default=None,
-              help="Output format (default: rich)")
+@click.option(
+    "--output",
+    "output_fmt",
+    type=click.Choice(["rich", "json", "csv"]),
+    default=None,
+    help="Output format (default: rich)",
+)
 @click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
 def chain(
     task_path: str,
@@ -509,14 +552,18 @@ def chain(
         # Validate meta-skills exist
         for ms_name in meta_skill_names:
             if ms_name not in task.meta_skills:
-                available = ", ".join(sorted(task.meta_skills.keys())) if task.meta_skills else "none"
+                available = (
+                    ", ".join(sorted(task.meta_skills.keys())) if task.meta_skills else "none"
+                )
                 raise click.ClickException(
                     f"Meta-skill '{ms_name}' not found. Available: {available}"
                 )
 
         # Estimate API calls
         gen_calls = len(meta_skill_names) * len(creator_models)
-        exec_calls = len(meta_skill_names) * len(creator_models) * len(executor_models) * task.config.trials
+        exec_calls = (
+            len(meta_skill_names) * len(creator_models) * len(executor_models) * task.config.trials
+        )
         total_calls = gen_calls + exec_calls
         all_models = creator_models + executor_models
         avg_input_cost = sum(m.input_cost_per_m for m in all_models) / len(all_models)
@@ -549,7 +596,9 @@ def chain(
         else:
             display_chain_results(summary.chain_results)
             if summary.recommendation:
-                console.print(f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}")
+                console.print(
+                    f"\n[bold green]Recommendation:[/bold green] {summary.recommendation}"
+                )
 
     except (ValueError, FileNotFoundError) as e:
         raise click.ClickException(str(e))
@@ -730,8 +779,7 @@ def skill_test(
         summaries = asyncio.run(_run_skill_test(cases, selected, parallel))
 
         aggregated: list[tuple[str, list[ModelResult]]] = [
-            (Path(case.path).name, summary.model_results)
-            for case, summary in zip(cases, summaries)
+            (Path(case.path).name, summary.model_results) for case, summary in zip(cases, summaries)
         ]
         display_skill_test_results(skill_prompt.name or "(unnamed skill)", aggregated)
 

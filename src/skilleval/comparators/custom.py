@@ -63,9 +63,7 @@ class CustomComparator:
             return False, "\n\n".join(diffs)
         return True, None
 
-    def _run_script(
-        self, script: Path, output_file: Path, expected_file: Path
-    ) -> tuple[bool, str]:
+    def _run_script(self, script: Path, output_file: Path, expected_file: Path) -> tuple[bool, str]:
         try:
             result = subprocess.run(
                 [str(script), str(expected_file), str(output_file)],

@@ -47,8 +47,13 @@ class TestGetComparator:
 
     def test_all_registered(self):
         expected_names = {
-            "json_exact", "csv_ordered", "csv_unordered",
-            "field_subset", "file_hash", "text_exact",
-            "text_contains", "custom",
+            "json_exact",
+            "csv_ordered",
+            "csv_unordered",
+            "field_subset",
+            "file_hash",
+            "text_exact",
+            "text_contains",
+            "custom",
         }
         assert set(COMPARATORS.keys()) == expected_names

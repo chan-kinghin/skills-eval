@@ -234,4 +234,3 @@ def _extract_phase_names(headings: list[Heading]) -> list[str]:
             if fallback:
                 phases.append(fallback)
     return phases
-

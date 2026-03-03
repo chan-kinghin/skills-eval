@@ -55,7 +55,9 @@ Explain how to reason about inputs and choose actions.
 
     # Extracted phases should capture names
     assert sp.phases and sp.phases[0].lower().startswith("setup")
-    assert any(p.lower().startswith("phase 2") or p.lower().startswith("analysis") for p in sp.phases)
+    assert any(
+        p.lower().startswith("phase 2") or p.lower().startswith("analysis") for p in sp.phases
+    )
 
     assert sp.source_path.name in {"skill.md", "SKILL.md"}
 
@@ -75,7 +77,7 @@ timeout: 30
 
     # case-2
     _write(tmp_path / "case-2" / "input" / "doc.txt", "hello\n")
-    _write(tmp_path / "case-2" / "expected" / "result.json", "{\"ok\": true}\n")
+    _write(tmp_path / "case-2" / "expected" / "result.json", '{"ok": true}\n')
 
     cases = load_test_cases(tmp_path)
     assert len(cases) == 2
@@ -93,4 +95,3 @@ timeout: 30
     assert any(p.name == "doc.txt" for p in cases[1].input_files)
     assert any(p.name == "result.json" for p in cases[1].expected_files)
     assert cases[1].config.trials == 2
-

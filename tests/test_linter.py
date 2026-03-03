@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
-from skilleval.linter import LintIssue, LintReport, lint_skill
+from skilleval.linter import LintReport, lint_skill
 
 
 def write(p: Path, content: str) -> None:
@@ -15,7 +13,9 @@ def write(p: Path, content: str) -> None:
 def test_missing_skill_file_reports_error(tmp_path: Path) -> None:
     report = lint_skill(tmp_path)
     assert isinstance(report, LintReport)
-    assert any(iss.severity == "error" and "Skill file not found" in iss.message for iss in report.issues)
+    assert any(
+        iss.severity == "error" and "Skill file not found" in iss.message for iss in report.issues
+    )
     assert report.quality_score < 100
 
 
@@ -85,7 +85,9 @@ No phases here.
 """
     write(tmp_path / "skill.md", skill_md)
     report = lint_skill(tmp_path)
-    assert any("No numbered phases/steps" in i.message for i in report.issues if i.severity == "error")
+    assert any(
+        "No numbered phases/steps" in i.message for i in report.issues if i.severity == "error"
+    )
 
 
 def test_missing_reference_files_reported(tmp_path: Path) -> None:
@@ -189,4 +191,3 @@ description: b
     # No errors expected (has phase, error handling, rules)
     errs = [i for i in report.issues if i.severity == "error"]
     assert not errs
-

@@ -72,14 +72,18 @@ def lint_skill(skill_dir: Path) -> LintReport:
     # 3) Extract frontmatter and body
     fm, fm_end_line, body, body_start_line = extract_frontmatter(text)
     if fm is None:
-        issues.append(LintIssue("error", "Missing YAML frontmatter (--- ... ---) at top of file.", line=1))
+        issues.append(
+            LintIssue("error", "Missing YAML frontmatter (--- ... ---) at top of file.", line=1)
+        )
     else:
         # Validate required fields
         if not isinstance(fm, dict):
             issues.append(LintIssue("error", "Frontmatter must be a YAML mapping.", line=1))
         else:
             if not fm.get("name"):
-                issues.append(LintIssue("error", "Frontmatter missing required field: name", line=1))
+                issues.append(
+                    LintIssue("error", "Frontmatter missing required field: name", line=1)
+                )
             if not fm.get("description"):
                 issues.append(
                     LintIssue("error", "Frontmatter missing required field: description", line=1)
@@ -100,9 +104,13 @@ def lint_skill(skill_dir: Path) -> LintReport:
 
     # 6) Required sections: Error Handling and Rules
     if not _has_error_handling_section(headings):
-        issues.append(LintIssue("warning", "Missing an Error Handling section (## Error Handling)."))
+        issues.append(
+            LintIssue("warning", "Missing an Error Handling section (## Error Handling).")
+        )
     if not _has_rules_section(headings):
-        issues.append(LintIssue("warning", "Missing a Rules section (## Rules or ## Important Rules)."))
+        issues.append(
+            LintIssue("warning", "Missing a Rules section (## Rules or ## Important Rules).")
+        )
 
     # 7) Reference links
     missing_refs = _check_references_safe(skill_dir, body, base_line=body_start_line)
@@ -180,7 +188,12 @@ def extract_frontmatter(text: str) -> tuple[dict | None, int, str, int]:
 
     body_lines = lines[end_idx + 1 :]
     body = "\n".join(body_lines)
-    return data, end_idx + 1, body, end_idx + 2  # end_idx is 0-based; body starts next line (1-based)
+    return (
+        data,
+        end_idx + 1,
+        body,
+        end_idx + 2,
+    )  # end_idx is 0-based; body starts next line (1-based)
 
 
 @dataclass
@@ -239,7 +252,9 @@ def _collect_code_blocks(text: str, base_line: int = 1) -> list[_CodeBlock]:
                 buf = []
                 start_line = line_no + 1  # First code line is next line
             else:
-                blocks.append(_CodeBlock(language=code_lang, code="\n".join(buf), start_line=start_line))
+                blocks.append(
+                    _CodeBlock(language=code_lang, code="\n".join(buf), start_line=start_line)
+                )
                 in_code = False
                 code_lang = ""
                 buf = []
@@ -379,7 +394,9 @@ def _check_references_safe(skill_dir: Path, body: str, base_line: int = 1) -> li
             try:
                 target.relative_to(base)
             except Exception:
-                issues.append(LintIssue("warning", f"Reference escapes skill directory: {rel_path}", line=idx))
+                issues.append(
+                    LintIssue("warning", f"Reference escapes skill directory: {rel_path}", line=idx)
+                )
                 continue
             if not target.exists():
                 issues.append(LintIssue("error", f"Missing reference file: {rel_path}", line=idx))

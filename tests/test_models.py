@@ -166,11 +166,18 @@ class TestMatrixCell:
     def test_construction(self):
         trial = TrialResult(model="exec", trial_number=1, passed=True)
         mr = ModelResult(
-            model="exec", pass_rate=1.0, trials=[trial],
-            avg_cost=0.0, avg_latency=0.0, total_cost=0.0,
+            model="exec",
+            pass_rate=1.0,
+            trials=[trial],
+            avg_cost=0.0,
+            avg_latency=0.0,
+            total_cost=0.0,
         )
         cell = MatrixCell(
-            creator="creator-m", executor="exec", generated_skill="do X", result=mr,
+            creator="creator-m",
+            executor="exec",
+            generated_skill="do X",
+            result=mr,
         )
         assert cell.creator == "creator-m"
         assert cell.executor == "exec"
@@ -180,11 +187,18 @@ class TestChainCell:
     def test_construction(self):
         trial = TrialResult(model="exec", trial_number=1, passed=True)
         mr = ModelResult(
-            model="exec", pass_rate=1.0, trials=[trial],
-            avg_cost=0.0, avg_latency=0.0, total_cost=0.0,
+            model="exec",
+            pass_rate=1.0,
+            trials=[trial],
+            avg_cost=0.0,
+            avg_latency=0.0,
+            total_cost=0.0,
         )
         cell = ChainCell(
-            meta_skill_name="ms1", creator="c", executor="exec",
-            generated_skill="do Y", result=mr,
+            meta_skill_name="ms1",
+            creator="c",
+            executor="exec",
+            generated_skill="do Y",
+            result=mr,
         )
         assert cell.meta_skill_name == "ms1"

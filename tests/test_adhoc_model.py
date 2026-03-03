@@ -79,4 +79,3 @@ class TestFiltersWithAdhoc:
         )
         result = filter_by_names([m], ["x-model"])
         assert len(result) == 1 and result[0].name == "x-model"
-

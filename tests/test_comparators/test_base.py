@@ -18,7 +18,7 @@ from skilleval.comparators.base import (
 
 class TestStripMarkdownFences:
     def test_json_fence(self):
-        text = "```json\n{\"a\": 1}\n```"
+        text = '```json\n{"a": 1}\n```'
         assert strip_markdown_fences(text) == '{"a": 1}'
 
     def test_plain_fence(self):
@@ -37,7 +37,7 @@ class TestStripMarkdownFences:
         assert strip_markdown_fences(text) == "a,b,c\n1,2,3"
 
     def test_multiline_content(self):
-        text = "```json\n{\n  \"a\": 1,\n  \"b\": 2\n}\n```"
+        text = '```json\n{\n  "a": 1,\n  "b": 2\n}\n```'
         result = strip_markdown_fences(text)
         assert '"a": 1' in result
         assert '"b": 2' in result

@@ -8,7 +8,9 @@ from skilleval.comparators.file_hash import FileHashComparator
 
 
 def _setup_dirs(
-    tmp_path: Path, output_bytes: bytes, expected_bytes: bytes,
+    tmp_path: Path,
+    output_bytes: bytes,
+    expected_bytes: bytes,
 ) -> tuple[Path, Path]:
     out_dir = tmp_path / "output"
     exp_dir = tmp_path / "expected"

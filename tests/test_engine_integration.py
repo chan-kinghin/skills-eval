@@ -73,9 +73,7 @@ class TestConcurrentExecution:
         model_b = _make_model(name="model-b", provider="provider-b")
         engine = ExecutionEngine(models=[model_a, model_b], max_global=10)
 
-        specs = [
-            _make_spec(model=model_a, trial_number=i) for i in range(1, 4)
-        ] + [
+        specs = [_make_spec(model=model_a, trial_number=i) for i in range(1, 4)] + [
             _make_spec(model=model_b, trial_number=i) for i in range(1, 4)
         ]
 
@@ -126,9 +124,7 @@ class TestConcurrentExecution:
         """Per-provider semaphore limits concurrency within one provider."""
         model = _make_model(name="m", provider="slow-provider")
         max_per_provider = 2
-        engine = ExecutionEngine(
-            models=[model], max_per_provider=max_per_provider, max_global=10
-        )
+        engine = ExecutionEngine(models=[model], max_per_provider=max_per_provider, max_global=10)
 
         concurrent_count = 0
         max_observed = 0
@@ -179,9 +175,7 @@ class TestCircuitBreaker:
         assert len(results) == total_trials
         assert all(not r.passed for r in results)
 
-        circuit_breaker_results = [
-            r for r in results if r.error and "Circuit breaker" in r.error
-        ]
+        circuit_breaker_results = [r for r in results if r.error and "Circuit breaker" in r.error]
         assert len(circuit_breaker_results) >= 1
 
     async def test_circuit_breaker_resets_on_success(self):

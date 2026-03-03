@@ -59,9 +59,7 @@ class TestOutputFormatHelpers:
             ModelResult(
                 model="cheap-model",
                 pass_rate=1.0,
-                trials=[
-                    TrialResult(model="cheap-model", trial_number=1, passed=True, cost=0.001)
-                ],
+                trials=[TrialResult(model="cheap-model", trial_number=1, passed=True, cost=0.001)],
                 avg_cost=0.001,
                 avg_latency=0.5,
                 total_cost=0.001,
@@ -166,9 +164,15 @@ class TestResumeFlag:
         (task_dir / "skill.md").write_text("Echo the input")
 
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "run", str(task_dir), "--resume", str(checkpoint_dir),
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                str(task_dir),
+                "--resume",
+                str(checkpoint_dir),
+            ],
+        )
 
         # Output should mention resuming
         assert "Resuming" in result.output or "No models available" in result.output
@@ -188,9 +192,15 @@ class TestResumeFlag:
         (task_dir / "skill.md").write_text("Echo the input")
 
         runner = CliRunner()
-        result = runner.invoke(cli, [
-            "run", str(task_dir), "--resume", str(empty_dir),
-        ])
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                str(task_dir),
+                "--resume",
+                str(empty_dir),
+            ],
+        )
 
         assert "No checkpoint found" in result.output or "No models available" in result.output
 

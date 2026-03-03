@@ -14,7 +14,14 @@ from skilleval.models import (
 )
 
 
-def _mr(model: str, pass_rate: float, trials: list[TrialResult], avg_cost=0.0, avg_latency=0.0, total_cost=0.0) -> ModelResult:
+def _mr(
+    model: str,
+    pass_rate: float,
+    trials: list[TrialResult],
+    avg_cost=0.0,
+    avg_latency=0.0,
+    total_cost=0.0,
+) -> ModelResult:
     return ModelResult(
         model=model,
         pass_rate=pass_rate,
@@ -26,12 +33,40 @@ def _mr(model: str, pass_rate: float, trials: list[TrialResult], avg_cost=0.0, a
 
 
 def test_generate_html_report_run_mode(tmp_path: Path) -> None:
-    t1 = TrialResult(model="modelA", trial_number=1, passed=True, output_text="ok", cost=0.001, latency_seconds=0.4)
-    t2 = TrialResult(model="modelA", trial_number=2, passed=True, output_text="ok2", cost=0.001, latency_seconds=0.5)
+    t1 = TrialResult(
+        model="modelA",
+        trial_number=1,
+        passed=True,
+        output_text="ok",
+        cost=0.001,
+        latency_seconds=0.4,
+    )
+    t2 = TrialResult(
+        model="modelA",
+        trial_number=2,
+        passed=True,
+        output_text="ok2",
+        cost=0.001,
+        latency_seconds=0.5,
+    )
     r1 = _mr("modelA", 1.0, [t1, t2], avg_cost=0.001, avg_latency=0.45, total_cost=0.002)
 
-    u1 = TrialResult(model="modelB", trial_number=1, passed=False, output_text="no", cost=0.002, latency_seconds=0.6)
-    u2 = TrialResult(model="modelB", trial_number=2, passed=True, output_text="ok", cost=0.002, latency_seconds=0.7)
+    u1 = TrialResult(
+        model="modelB",
+        trial_number=1,
+        passed=False,
+        output_text="no",
+        cost=0.002,
+        latency_seconds=0.6,
+    )
+    u2 = TrialResult(
+        model="modelB",
+        trial_number=2,
+        passed=True,
+        output_text="ok",
+        cost=0.002,
+        latency_seconds=0.7,
+    )
     r2 = _mr("modelB", 0.5, [u1, u2], avg_cost=0.002, avg_latency=0.65, total_cost=0.004)
 
     summary = RunSummary(
@@ -84,13 +119,37 @@ def test_generate_html_report_matrix_mode(tmp_path: Path) -> None:
 
 def test_generate_html_report_chain_mode(tmp_path: Path) -> None:
     # Two meta-skill variants with differing averages
-    r1 = _mr("exec", 1.0, [TrialResult(model="exec", trial_number=1, passed=True)], avg_cost=0.001, avg_latency=0.5)
-    r2 = _mr("exec", 0.8, [TrialResult(model="exec", trial_number=1, passed=True)], avg_cost=0.002, avg_latency=0.6)
-    r3 = _mr("exec", 0.5, [TrialResult(model="exec", trial_number=1, passed=False)], avg_cost=0.003, avg_latency=0.7)
+    r1 = _mr(
+        "exec",
+        1.0,
+        [TrialResult(model="exec", trial_number=1, passed=True)],
+        avg_cost=0.001,
+        avg_latency=0.5,
+    )
+    r2 = _mr(
+        "exec",
+        0.8,
+        [TrialResult(model="exec", trial_number=1, passed=True)],
+        avg_cost=0.002,
+        avg_latency=0.6,
+    )
+    r3 = _mr(
+        "exec",
+        0.5,
+        [TrialResult(model="exec", trial_number=1, passed=False)],
+        avg_cost=0.003,
+        avg_latency=0.7,
+    )
 
-    a = ChainCell(meta_skill_name="ms1", creator="c1", executor="e1", generated_skill="g1", result=r1)
-    b = ChainCell(meta_skill_name="ms1", creator="c2", executor="e2", generated_skill="g2", result=r2)
-    c = ChainCell(meta_skill_name="ms2", creator="c1", executor="e1", generated_skill="g3", result=r3)
+    a = ChainCell(
+        meta_skill_name="ms1", creator="c1", executor="e1", generated_skill="g1", result=r1
+    )
+    b = ChainCell(
+        meta_skill_name="ms1", creator="c2", executor="e2", generated_skill="g2", result=r2
+    )
+    c = ChainCell(
+        meta_skill_name="ms2", creator="c1", executor="e1", generated_skill="g3", result=r3
+    )
 
     summary = RunSummary(
         mode="chain",
@@ -107,4 +166,3 @@ def test_generate_html_report_chain_mode(tmp_path: Path) -> None:
     assert "Pass Rate by Variant" in html
     assert "Variant Details" in html
     assert "ms1" in html and "ms2" in html
-

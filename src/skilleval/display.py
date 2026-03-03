@@ -114,16 +114,20 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
     # Summary stats
     if cells:
         best_pair = max(cells, key=lambda c: (c.result.pass_rate, -c.result.avg_cost))
-        console.print(f"\n[bold]Best pair:[/bold] {best_pair.creator} -> {best_pair.executor} "
-                      f"({best_pair.result.pass_rate * 100:.0f}%, "
-                      f"${best_pair.result.avg_cost:.6f}/run)")
+        console.print(
+            f"\n[bold]Best pair:[/bold] {best_pair.creator} -> {best_pair.executor} "
+            f"({best_pair.result.pass_rate * 100:.0f}%, "
+            f"${best_pair.result.avg_cost:.6f}/run)"
+        )
 
         perfect = [c for c in cells if c.result.pass_rate == 1.0]
         if perfect:
             cheapest = min(perfect, key=lambda c: c.result.avg_cost)
-            console.print(f"[bold green]Cheapest @ 100%:[/bold green] "
-                          f"{cheapest.creator} -> {cheapest.executor} "
-                          f"(${cheapest.result.avg_cost:.6f}/run)")
+            console.print(
+                f"[bold green]Cheapest @ 100%:[/bold green] "
+                f"{cheapest.creator} -> {cheapest.executor} "
+                f"(${cheapest.result.avg_cost:.6f}/run)"
+            )
 
 
 def display_chain_results(cells: list[ChainCell]) -> None:
@@ -200,16 +204,14 @@ def display_catalog(models: list[ModelEntry], available: list[str]) -> None:
     if missing:
         env_keys = sorted({m.env_key for m in missing})
         console.print(
-            f"\n[dim]Tip: Set these env vars to unlock more models: "
-            f"{', '.join(env_keys)}[/dim]"
+            f"\n[dim]Tip: Set these env vars to unlock more models: {', '.join(env_keys)}[/dim]"
         )
 
 
 def display_pre_run_estimate(num_calls: int, estimated_cost: float) -> None:
     """Show estimated API calls and cost before execution."""
     console.print(
-        f"\n[bold]Estimated:[/bold] {num_calls} API calls, "
-        f"~${estimated_cost:.2f} total cost"
+        f"\n[bold]Estimated:[/bold] {num_calls} API calls, ~${estimated_cost:.2f} total cost"
     )
 
 
@@ -325,7 +327,9 @@ def display_skill_test_results(
             else:
                 rate_style = "red"
 
-            table.add_row(case_name, r.model, Text(rate_pct, style=rate_style), f"${r.avg_cost:.6f}")
+            table.add_row(
+                case_name, r.model, Text(rate_pct, style=rate_style), f"${r.avg_cost:.6f}"
+            )
 
             # Update summary counters per model
             ok, total = per_model_totals.get(r.model, (0, 0))

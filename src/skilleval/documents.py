@@ -67,7 +67,9 @@ def _extract_pdf(file_path: Path) -> str:
                     pages.append(f"[Page {i} - Table {j}]\n{table_text}")
 
     if not pages:
-        raise ValueError(f"Could not extract text from '{file_path.name}'. The PDF may be scanned/image-based.")
+        raise ValueError(
+            f"Could not extract text from '{file_path.name}'. The PDF may be scanned/image-based."
+        )
 
     return "\n\n".join(pages)
 
@@ -100,7 +102,9 @@ def _extract_docx(file_path: Path) -> str:
             parts.append(f"[Table {i}]\n{table_text}")
 
     if not parts:
-        raise ValueError(f"Could not extract text from '{file_path.name}'. The document appears to be empty.")
+        raise ValueError(
+            f"Could not extract text from '{file_path.name}'. The document appears to be empty."
+        )
 
     return "\n\n".join(parts)
 
@@ -110,9 +114,7 @@ def _extract_xlsx(file_path: Path) -> str:
     try:
         import openpyxl
     except ImportError:
-        raise RuntimeError(
-            "XLSX support requires openpyxl. Install it with: pip install openpyxl"
-        )
+        raise RuntimeError("XLSX support requires openpyxl. Install it with: pip install openpyxl")
 
     wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=True)
     parts = []
@@ -132,7 +134,9 @@ def _extract_xlsx(file_path: Path) -> str:
     wb.close()
 
     if not parts:
-        raise ValueError(f"Could not extract data from '{file_path.name}'. The workbook appears to be empty.")
+        raise ValueError(
+            f"Could not extract data from '{file_path.name}'. The workbook appears to be empty."
+        )
 
     return "\n\n".join(parts)
 
@@ -223,8 +227,11 @@ def input_descriptions(input_files: list[Path], max_chars: int = 200) -> str:
                 preview += "..."
             suffix = f.suffix.lower()
             type_label = {
-                ".pdf": "PDF", ".docx": "Word", ".xlsx": "Excel",
-                ".json": "JSON", ".csv": "CSV",
+                ".pdf": "PDF",
+                ".docx": "Word",
+                ".xlsx": "Excel",
+                ".json": "JSON",
+                ".csv": "CSV",
             }.get(suffix, "text")
             parts.append(f"- {f.name} ({type_label}): {preview}")
         except (ValueError, RuntimeError) as e:

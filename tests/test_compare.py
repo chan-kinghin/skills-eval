@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from pathlib import Path
 
-from skilleval.compare import ComparisonEntry, ComparisonReport, compare_runs
+from skilleval.compare import ComparisonReport, compare_runs
 from skilleval.models import (
     ChainCell,
     MatrixCell,
@@ -86,14 +86,26 @@ class TestCompareMatrixMode:
         new_dir = tmp_path / "new_m"
 
         cells_old = [
-            MatrixCell(creator="c1", executor="e1", generated_skill="s1", result=_mr("e1", 0.5, 0.01)),
-            MatrixCell(creator="c2", executor="e2", generated_skill="s2", result=_mr("e2", 0.9, 0.02)),
-            MatrixCell(creator="c3", executor="e3", generated_skill="s3", result=_mr("e3", 0.6, 0.03)),
+            MatrixCell(
+                creator="c1", executor="e1", generated_skill="s1", result=_mr("e1", 0.5, 0.01)
+            ),
+            MatrixCell(
+                creator="c2", executor="e2", generated_skill="s2", result=_mr("e2", 0.9, 0.02)
+            ),
+            MatrixCell(
+                creator="c3", executor="e3", generated_skill="s3", result=_mr("e3", 0.6, 0.03)
+            ),
         ]
         cells_new = [
-            MatrixCell(creator="c1", executor="e1", generated_skill="s1", result=_mr("e1", 0.7, 0.011)),  # improved
-            MatrixCell(creator="c2", executor="e2", generated_skill="s2", result=_mr("e2", 0.9, 0.019)),  # unchanged rate
-            MatrixCell(creator="c4", executor="e4", generated_skill="s4", result=_mr("e4", 0.8, 0.02)),   # new
+            MatrixCell(
+                creator="c1", executor="e1", generated_skill="s1", result=_mr("e1", 0.7, 0.011)
+            ),  # improved
+            MatrixCell(
+                creator="c2", executor="e2", generated_skill="s2", result=_mr("e2", 0.9, 0.019)
+            ),  # unchanged rate
+            MatrixCell(
+                creator="c4", executor="e4", generated_skill="s4", result=_mr("e4", 0.8, 0.02)
+            ),  # new
         ]
 
         old = RunSummary(mode="matrix", task_path="/t", timestamp="t0", matrix_results=cells_old)
@@ -167,4 +179,3 @@ class TestMismatchedModes:
 
         with pytest.raises(ValueError):
             compare_runs(old_dir, new_dir)
-

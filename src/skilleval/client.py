@@ -96,7 +96,9 @@ class ModelClient:
                         last_error = RateLimitError(f"Rate limited by {model.provider}")
                         logger.warning(
                             "Rate limit (429) from %s, attempt %d/%d",
-                            model.provider, attempt + 1, self._max_retries,
+                            model.provider,
+                            attempt + 1,
+                            self._max_retries,
                         )
                         retry_after = resp.headers.get("Retry-After")
                         if retry_after:
@@ -115,7 +117,10 @@ class ModelClient:
                         last_error = ApiError(resp.status, text)
                         logger.warning(
                             "Server error %d from %s, attempt %d/%d",
-                            resp.status, model.name, attempt + 1, self._max_retries,
+                            resp.status,
+                            model.name,
+                            attempt + 1,
+                            self._max_retries,
                         )
                         await self._backoff(attempt)
                         continue
@@ -124,7 +129,9 @@ class ModelClient:
                         text = await resp.text()
                         logger.error(
                             "Non-retryable API error %d from %s: %s",
-                            resp.status, model.name, text[:200],
+                            resp.status,
+                            model.name,
+                            text[:200],
                         )
                         raise ApiError(resp.status, text)
 
@@ -139,14 +146,18 @@ class ModelClient:
                         )
                         logger.warning(
                             "Empty response from %s (silent rate-limit), attempt %d/%d",
-                            model.provider, attempt + 1, self._max_retries,
+                            model.provider,
+                            attempt + 1,
+                            self._max_retries,
                         )
                         await self._backoff(attempt)
                         continue
 
                     logger.debug(
                         "Successful response from %s: in=%d out=%d tokens, %.2fs",
-                        model.name, parsed.input_tokens, parsed.output_tokens,
+                        model.name,
+                        parsed.input_tokens,
+                        parsed.output_tokens,
                         parsed.latency_seconds,
                     )
                     return parsed
@@ -158,7 +169,10 @@ class ModelClient:
                 )
                 logger.warning(
                     "Timeout for %s after %.1fs, attempt %d/%d",
-                    model.name, latency, attempt + 1, self._max_retries,
+                    model.name,
+                    latency,
+                    attempt + 1,
+                    self._max_retries,
                 )
                 await self._backoff(attempt)
             except (ApiError, RateLimitError, TimeoutError):
@@ -168,7 +182,10 @@ class ModelClient:
                 last_error = ApiError(0, f"Connection error: {e}")
                 logger.warning(
                     "Connection error for %s: %s, attempt %d/%d",
-                    model.name, e, attempt + 1, self._max_retries,
+                    model.name,
+                    e,
+                    attempt + 1,
+                    self._max_retries,
                 )
                 await self._backoff(attempt)
 

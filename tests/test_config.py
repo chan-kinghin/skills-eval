@@ -85,12 +85,20 @@ class TestFilterAvailable:
 
         models = [
             ModelEntry(
-                name="a", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="KEY_A",
+                name="a",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="KEY_A",
             ),
             ModelEntry(
-                name="b", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="KEY_B",
+                name="b",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="KEY_B",
             ),
         ]
         result = filter_available(models)
@@ -101,8 +109,12 @@ class TestFilterAvailable:
         monkeypatch.delenv("NOPE", raising=False)
         models = [
             ModelEntry(
-                name="x", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="NOPE",
+                name="x",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="NOPE",
             ),
         ]
         assert filter_available(models) == []
@@ -115,12 +127,20 @@ class TestFilterByNames:
     def test_matching_names(self):
         models = [
             ModelEntry(
-                name="alpha", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="K",
+                name="alpha",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="K",
             ),
             ModelEntry(
-                name="beta", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="K",
+                name="beta",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="K",
             ),
         ]
         result = filter_by_names(models, ["beta"])
@@ -130,8 +150,12 @@ class TestFilterByNames:
     def test_missing_name_raises(self):
         models = [
             ModelEntry(
-                name="alpha", provider="p", endpoint="http://x",
-                input_cost_per_m=0, output_cost_per_m=0, env_key="K",
+                name="alpha",
+                provider="p",
+                endpoint="http://x",
+                input_cost_per_m=0,
+                output_cost_per_m=0,
+                env_key="K",
             ),
         ]
         with pytest.raises(ValueError, match="not found in catalog"):

@@ -15,11 +15,11 @@ from conftest import make_trial
 
 class TestCleanOutput:
     def test_strips_think_tags(self):
-        text = "<think>reasoning here</think>\n{\"answer\": 42}"
+        text = '<think>reasoning here</think>\n{"answer": 42}'
         assert _clean_output(text) == '{"answer": 42}'
 
     def test_strips_reasoning_tags(self):
-        text = "<reasoning>chain of thought</reasoning>\n{\"answer\": 42}"
+        text = '<reasoning>chain of thought</reasoning>\n{"answer": 42}'
         assert _clean_output(text) == '{"answer": 42}'
 
     def test_strips_thinking_tags(self):
@@ -27,7 +27,7 @@ class TestCleanOutput:
         assert _clean_output(text) == "result"
 
     def test_strips_markdown_fences(self):
-        text = "```json\n{\"a\": 1}\n```"
+        text = '```json\n{"a": 1}\n```'
         assert _clean_output(text) == '{"a": 1}'
 
     def test_strips_plain_fences(self):
@@ -35,7 +35,7 @@ class TestCleanOutput:
         assert _clean_output(text) == "hello"
 
     def test_strips_tags_then_fences(self):
-        text = "<think>thought</think>\n```json\n{\"a\": 1}\n```"
+        text = '<think>thought</think>\n```json\n{"a": 1}\n```'
         assert _clean_output(text) == '{"a": 1}'
 
     def test_strips_whitespace(self):
@@ -102,7 +102,9 @@ class TestAggregateTrials:
 
 
 def _make_model_result(
-    model: str, pass_rate: float, avg_cost: float,
+    model: str,
+    pass_rate: float,
+    avg_cost: float,
 ) -> ModelResult:
     return ModelResult(
         model=model,

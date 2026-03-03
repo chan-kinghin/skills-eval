@@ -33,12 +33,8 @@ class CsvUnorderedComparator(FileComparator):
         expected_rows = self._parse_csv(expected_text)
         output_rows = self._parse_csv(output_text)
 
-        expected_counter: Counter[tuple[str, ...]] = Counter(
-            tuple(row) for row in expected_rows
-        )
-        output_counter: Counter[tuple[str, ...]] = Counter(
-            tuple(row) for row in output_rows
-        )
+        expected_counter: Counter[tuple[str, ...]] = Counter(tuple(row) for row in expected_rows)
+        output_counter: Counter[tuple[str, ...]] = Counter(tuple(row) for row in output_rows)
 
         if expected_counter == output_counter:
             return True, ""

@@ -187,9 +187,7 @@ class TestEmptyResponseRetry:
     """Empty response (silent rate-limit) triggers retry; succeeds on second attempt."""
 
     @patch.object(ModelClient, "_backoff", new=_noop_backoff)
-    async def test_empty_content_0_tokens_then_real_response(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_empty_content_0_tokens_then_real_response(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("TEST_API_KEY", "sk-test-key")
         model = _make_model()
         config = _make_config()
@@ -221,7 +219,9 @@ class TestConnectionErrorRetry:
 
         with aioresponses() as mocked:
             for _ in range(3):
-                mocked.post(_CHAT_URL, exception=aiohttp.ClientConnectionError("Connection refused"))
+                mocked.post(
+                    _CHAT_URL, exception=aiohttp.ClientConnectionError("Connection refused")
+                )
 
             async with ModelClient() as client:
                 with pytest.raises(ApiError, match="Connection error"):
@@ -286,9 +286,7 @@ class TestAdhocModelApiKey:
         # We verify indirectly: the request succeeded without _ADHOC_ env var.
 
     @patch.object(ModelClient, "_backoff", new=_noop_backoff)
-    async def test_adhoc_model_api_key_sent_in_auth_header(
-        self, monkeypatch: pytest.MonkeyPatch
-    ):
+    async def test_adhoc_model_api_key_sent_in_auth_header(self, monkeypatch: pytest.MonkeyPatch):
         """Verify that the Authorization header contains the embedded api_key."""
         monkeypatch.delenv("_ADHOC_", raising=False)
 

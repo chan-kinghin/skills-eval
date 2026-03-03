@@ -48,9 +48,7 @@ class FileComparator(abc.ABC):
         ...
 
 
-def get_file_pairs(
-    output_dir: Path, expected_dir: Path
-) -> list[tuple[Path, Path]]:
+def get_file_pairs(output_dir: Path, expected_dir: Path) -> list[tuple[Path, Path]]:
     """Match files from output_dir to expected_dir by filename.
 
     Returns list of (output_file, expected_file) pairs.

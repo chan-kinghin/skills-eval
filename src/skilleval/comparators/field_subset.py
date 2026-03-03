@@ -67,18 +67,22 @@ class FieldSubsetComparator(FileComparator):
                 errors.append(f"{path}: expected array, got {type(output).__name__}")
                 return
             if len(expected) != len(output):
-                errors.append(
-                    f"{path}: expected array length {len(expected)}, got {len(output)}"
-                )
+                errors.append(f"{path}: expected array length {len(expected)}, got {len(output)}")
                 return
             for i, (exp_item, out_item) in enumerate(zip(expected, output)):
                 self._check_subset(exp_item, out_item, f"{path}[{i}]", errors)
 
         else:
             # Scalar comparison: normalize int/float per JSON RFC 8259
-            exp_val = float(expected) if isinstance(expected, int) and not isinstance(expected, bool) else expected
-            out_val = float(output) if isinstance(output, int) and not isinstance(output, bool) else output
+            exp_val = (
+                float(expected)
+                if isinstance(expected, int) and not isinstance(expected, bool)
+                else expected
+            )
+            out_val = (
+                float(output)
+                if isinstance(output, int) and not isinstance(output, bool)
+                else output
+            )
             if type(exp_val) is not type(out_val) or exp_val != out_val:
-                errors.append(
-                    f"{path}: expected {json.dumps(expected)}, got {json.dumps(output)}"
-                )
+                errors.append(f"{path}: expected {json.dumps(expected)}, got {json.dumps(output)}")

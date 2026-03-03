@@ -163,9 +163,7 @@ class TestExecuteTrialApiError:
 
         async with engine:
             engine._client = AsyncMock()  # type: ignore[assignment]
-            engine._client.chat_completion = AsyncMock(
-                side_effect=ApiError(403, "Forbidden")
-            )
+            engine._client.chat_completion = AsyncMock(side_effect=ApiError(403, "Forbidden"))
 
             result = await engine.execute_trial(
                 model=model,
@@ -240,9 +238,7 @@ class TestExecuteBatch:
 
         specs = [_make_spec(trial_number=i) for i in range(1, 4)]
 
-        responses = [
-            _make_chat_response(content=f"Response {i}") for i in range(1, 4)
-        ]
+        responses = [_make_chat_response(content=f"Response {i}") for i in range(1, 4)]
 
         call_count = 0
 
@@ -279,9 +275,7 @@ class TestExecuteBatchWithProgress:
 
         async with engine:
             engine._client = AsyncMock()  # type: ignore[assignment]
-            engine._client.chat_completion = AsyncMock(
-                return_value=_make_chat_response()
-            )
+            engine._client.chat_completion = AsyncMock(return_value=_make_chat_response())
 
             await engine.execute_batch(specs, on_progress=on_progress)
 
@@ -398,9 +392,7 @@ class TestConcurrencySemaphores:
             assert "new-provider" not in engine._provider_semaphores
 
             engine._client = AsyncMock()  # type: ignore[assignment]
-            engine._client.chat_completion = AsyncMock(
-                return_value=_make_chat_response()
-            )
+            engine._client.chat_completion = AsyncMock(return_value=_make_chat_response())
 
             await engine.execute_trial(
                 model=model_new,

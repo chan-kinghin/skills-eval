@@ -14,9 +14,7 @@ class Settings:
         self.circuit_breaker_threshold: int = int(
             os.environ.get("SKILLEVAL_CIRCUIT_BREAKER_THRESHOLD", "5")
         )
-        self.max_per_provider: int = int(
-            os.environ.get("SKILLEVAL_MAX_PER_PROVIDER", "5")
-        )
+        self.max_per_provider: int = int(os.environ.get("SKILLEVAL_MAX_PER_PROVIDER", "5"))
         self.max_global: int = int(os.environ.get("SKILLEVAL_MAX_GLOBAL", "20"))
 
         backoff_env = os.environ.get("SKILLEVAL_BACKOFF_BASE")

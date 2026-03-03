@@ -114,7 +114,12 @@ class ResultWriter:
         import asyncio
 
         await asyncio.to_thread(
-            self.write_trial_output, model, trial_num, output_text, diff, meta,
+            self.write_trial_output,
+            model,
+            trial_num,
+            output_text,
+            diff,
+            meta,
         )
 
     async def write_summary_async(self, summary: RunSummary) -> None:

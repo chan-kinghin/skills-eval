@@ -50,8 +50,7 @@ class ExecutionEngine:
         self._client = await self._exit_stack.enter_async_context(ModelClient())
         self._global_semaphore = asyncio.Semaphore(self._max_global)
         self._provider_semaphores = {
-            m.provider: asyncio.Semaphore(self._max_per_provider)
-            for m in self._models
+            m.provider: asyncio.Semaphore(self._max_per_provider) for m in self._models
         }
         return self
 
@@ -83,7 +82,9 @@ class ExecutionEngine:
         if self._failure_counts.get(model.provider, 0) >= self._circuit_breaker_threshold:
             logger.warning(
                 "Circuit breaker open for %s — skipping trial %d for %s",
-                model.provider, trial_number, model.name,
+                model.provider,
+                trial_number,
+                model.name,
             )
             return TrialResult(
                 model=model.name,
@@ -102,10 +103,14 @@ class ExecutionEngine:
             # Detect empty responses — some providers silently return empty
             # content instead of proper 429/error (e.g. Zhipu free tier)
             if not response.content.strip() and response.output_tokens == 0:
-                self._failure_counts[model.provider] = self._failure_counts.get(model.provider, 0) + 1
+                self._failure_counts[model.provider] = (
+                    self._failure_counts.get(model.provider, 0) + 1
+                )
                 logger.warning(
                     "Empty response detected for %s trial %d (consecutive failures: %d)",
-                    model.name, trial_number, self._failure_counts[model.provider],
+                    model.name,
+                    trial_number,
+                    self._failure_counts[model.provider],
                 )
                 return TrialResult(
                     model=model.name,
@@ -121,10 +126,14 @@ class ExecutionEngine:
                 )
 
             if response.finish_reason == "length":
-                self._failure_counts[model.provider] = self._failure_counts.get(model.provider, 0) + 1
+                self._failure_counts[model.provider] = (
+                    self._failure_counts.get(model.provider, 0) + 1
+                )
                 logger.warning(
                     "Output truncation detected for %s trial %d (consecutive failures: %d)",
-                    model.name, trial_number, self._failure_counts[model.provider],
+                    model.name,
+                    trial_number,
+                    self._failure_counts[model.provider],
                 )
                 return TrialResult(
                     model=model.name,
@@ -158,7 +167,10 @@ class ExecutionEngine:
             self._failure_counts[model.provider] = self._failure_counts.get(model.provider, 0) + 1
             logger.error(
                 "Trial %d failed for %s: %s (consecutive failures: %d)",
-                trial_number, model.name, e, self._failure_counts[model.provider],
+                trial_number,
+                model.name,
+                e,
+                self._failure_counts[model.provider],
             )
             return TrialResult(
                 model=model.name,

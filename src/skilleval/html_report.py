@@ -189,25 +189,27 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
         badge = (
             '<span class="badge pass">100%</span>'
             if r.pass_rate == 1.0
-            else '<span class="badge partial">80%+</span>' if r.pass_rate >= 0.8 else '<span class="badge fail">&lt;80%</span>'
+            else '<span class="badge partial">80%+</span>'
+            if r.pass_rate >= 0.8
+            else '<span class="badge fail">&lt;80%</span>'
         )
         parts.append(
-            "<div style=\"margin:10px 0;\">"
-            f"<div class=\"bar\"><div class=\"fill {cls}\" style=\"width:{width_pct:.0f}%;\"></div></div>"
-            f"<div class=\"bar-label\"><span>{escape(label)}</span>"
+            '<div style="margin:10px 0;">'
+            f'<div class="bar"><div class="fill {cls}" style="width:{width_pct:.0f}%;"></div></div>'
+            f'<div class="bar-label"><span>{escape(label)}</span>'
             f"<span>${r.avg_cost:.6f}/run{badge}</span></div>"
             "</div>"
         )
     parts.append("</div>")
 
     # Cost comparison table
-    parts.append("<h3 style=\"margin-top:16px;\">Cost Comparison</h3>")
-    parts.append("<div style=\"overflow:auto;\">")
+    parts.append('<h3 style="margin-top:16px;">Cost Comparison</h3>')
+    parts.append('<div style="overflow:auto;">')
     parts.append(
         "<table>"
         "<thead><tr>"
-        "<th>Model</th><th>Pass Rate</th><th class=\"num\">Avg Cost</th>"
-        "<th class=\"num\">Avg Latency</th><th class=\"num\">Total Cost</th>"
+        '<th>Model</th><th>Pass Rate</th><th class="num">Avg Cost</th>'
+        '<th class="num">Avg Latency</th><th class="num">Total Cost</th>'
         "</tr></thead><tbody>"
     )
     for r in results:
@@ -215,9 +217,9 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
             "<tr>"
             f"<td>{escape(r.model)}</td>"
             f"<td>{r.pass_rate * 100:.0f}%</td>"
-            f"<td class=\"num\">${r.avg_cost:.6f}</td>"
-            f"<td class=\"num\">{r.avg_latency:.2f}s</td>"
-            f"<td class=\"num\">${r.total_cost:.6f}</td>"
+            f'<td class="num">${r.avg_cost:.6f}</td>'
+            f'<td class="num">{r.avg_latency:.2f}s</td>'
+            f'<td class="num">${r.total_cost:.6f}</td>'
             "</tr>"
         )
     parts.append("</tbody></table></div>")
@@ -227,7 +229,7 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
         '<div style="display:flex; gap:8px; margin:12px 0 6px;">'
         '<button onclick="toggleAll(true)">Expand all</button>'
         '<button onclick="toggleAll(false)">Collapse all</button>'
-        '</div>'
+        "</div>"
     )
     parts.append("<h3>Per-Model Trials</h3>")
     for r in results:
@@ -250,19 +252,17 @@ def _render_trials_block(r: ModelResult) -> str:
     ]
     for t in r.trials:
         status = "PASS" if t.passed else "FAIL"
-        status_color = (
-            "var(--soft-green)" if t.passed else "var(--soft-red)"
-        )
+        status_color = "var(--soft-green)" if t.passed else "var(--soft-red)"
         output_snippet = escape((t.output_text or "").strip())
         if len(output_snippet) > 120:
             output_snippet = output_snippet[:117] + "…"
         rows.append(
             "<tr>"
-            f"<td class=\"num\">{t.trial_number}</td>"
-            f"<td><span class=\"badge\" style=\"background:{status_color}\">{status}</span></td>"
-            f"<td class=\"num\">${t.cost:.6f}</td>"
-            f"<td class=\"num\">{t.latency_seconds:.2f}s</td>"
-            f"<td style=\"max-width:420px; overflow:hidden; text-overflow:ellipsis;\">{output_snippet}</td>"
+            f'<td class="num">{t.trial_number}</td>'
+            f'<td><span class="badge" style="background:{status_color}">{status}</span></td>'
+            f'<td class="num">${t.cost:.6f}</td>'
+            f'<td class="num">{t.latency_seconds:.2f}s</td>'
+            f'<td style="max-width:420px; overflow:hidden; text-overflow:ellipsis;">{output_snippet}</td>'
             f"<td>{escape(t.error) if t.error else ''}</td>"
             "</tr>"
         )
@@ -290,7 +290,7 @@ def _render_matrix_mode(cells: list[MatrixCell]) -> str:
         f"({best.result.pass_rate * 100:.0f}% @ ${best.result.avg_cost:.6f}/run)</p>"
     )
 
-    parts.append("<div style=\"overflow:auto;\"><table>")
+    parts.append('<div style="overflow:auto;"><table>')
     # Header row
     parts.append("<thead><tr><th>Creator \\ Executor</th>")
     for ex in executors:
@@ -309,11 +309,11 @@ def _render_matrix_mode(cells: list[MatrixCell]) -> str:
             hue = int(rate * 120)  # 0 -> red, 60 -> yellow, 120 -> green
             # Soft, readable background color using HSL
             bg = f"hsl({hue}, 65%, 85%)"
-            is_best = (cr == best.creator and ex == best.executor)
+            is_best = cr == best.creator and ex == best.executor
             cls = "cell best" if is_best else "cell"
             parts.append(
-                f"<td data-creator=\"{escape(cr)}\" data-executor=\"{escape(ex)}\">"
-                f"<div class=\"{cls}\" style=\"background:{bg}\">{pct}</div>"
+                f'<td data-creator="{escape(cr)}" data-executor="{escape(ex)}">'
+                f'<div class="{cls}" style="background:{bg}">{pct}</div>'
                 "</td>"
             )
         parts.append("</tr>")
@@ -343,21 +343,21 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
         width_pct = max(0.0, min(100.0, avg * 100.0))
         cls = "green" if avg == 1.0 else "yellow" if avg >= 0.8 else "red"
         parts.append(
-            "<div style=\"margin:10px 0;\">"
-            f"<div class=\"bar\"><div class=\"fill {cls}\" style=\"width:{width_pct:.0f}%;\"></div></div>"
-            f"<div class=\"bar-label\"><span>{escape(meta)}</span>"
+            '<div style="margin:10px 0;">'
+            f'<div class="bar"><div class="fill {cls}" style="width:{width_pct:.0f}%;"></div></div>'
+            f'<div class="bar-label"><span>{escape(meta)}</span>'
             f"<span>{avg * 100:.1f}% avg</span></div>"
             "</div>"
         )
 
     # Grouped results by meta-skill variant
-    parts.append("<h3 style=\"margin-top:16px;\">Variant Details</h3>")
+    parts.append('<h3 style="margin-top:16px;">Variant Details</h3>')
     for meta, items in sorted(by_meta.items()):
         parts.append(f"<details><summary>{escape(meta)}</summary>")
         parts.append("<table>")
         parts.append(
             "<thead><tr><th>Creator</th><th>Executor</th><th>Pass Rate</th>"
-            "<th class=\"num\">Avg Cost</th><th class=\"num\">Avg Latency</th></tr></thead><tbody>"
+            '<th class="num">Avg Cost</th><th class="num">Avg Latency</th></tr></thead><tbody>'
         )
         for c in items:
             r = c.result
@@ -366,8 +366,8 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
                 f"<td>{escape(c.creator)}</td>"
                 f"<td>{escape(c.executor)}</td>"
                 f"<td>{r.pass_rate * 100:.0f}%</td>"
-                f"<td class=\"num\">${r.avg_cost:.6f}</td>"
-                f"<td class=\"num\">{r.avg_latency:.2f}s</td>"
+                f'<td class="num">${r.avg_cost:.6f}</td>'
+                f'<td class="num">{r.avg_latency:.2f}s</td>'
                 "</tr>"
             )
         parts.append("</tbody></table>")
@@ -383,4 +383,3 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
 def _avg(values: Iterable[float]) -> float:
     vals = list(values)
     return sum(vals) / len(vals) if vals else 0.0
-
