@@ -59,6 +59,8 @@ SkillEval runs your task against multiple models in parallel, automatically comp
 | **Qwen** | Alibaba Cloud / DashScope | https://dashscope.console.aliyun.com/ |
 | **GLM** | Zhipu AI / BigModel | https://open.bigmodel.cn/ |
 | **MiniMax** | MiniMax | https://platform.minimax.io/ |
+| **OpenAI** | OpenAI | https://platform.openai.com/ |
+| **DeepSeek** | DeepSeek | https://platform.deepseek.com/ |
 
 All providers use OpenAI-compatible chat completion APIs.
 
@@ -70,6 +72,12 @@ All providers use OpenAI-compatible chat completion APIs.
 
 - **Python 3.11** or later (SkillEval uses `str | None` union syntax)
 - At least one provider API key
+
+### Install from PyPI (Recommended)
+
+```bash
+pip install skilleval
+```
 
 ### Install from Source
 
@@ -107,6 +115,12 @@ export ZHIPU_API_KEY="..."
 
 # MiniMax
 export MINIMAX_API_KEY="..."
+
+# OpenAI
+export OPENAI_API_KEY="sk-..."
+
+# DeepSeek
+export DEEPSEEK_API_KEY="sk-..."
 ```
 
 You only need keys for providers whose models you want to evaluate. SkillEval automatically detects which keys are set and filters the model catalog accordingly.
@@ -187,7 +201,7 @@ A **trial** is a single API call to a model. By default, SkillEval runs 5 trials
 
 ### Comparator
 
-A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 6 comparators (see [Comparators](#21-comparators)).
+A **comparator** is the strategy used to check whether a model's output matches the expected result. SkillEval ships with 8 comparators (see [Comparators](#21-comparators)).
 
 ### Modes
 
@@ -925,6 +939,8 @@ output_format: json
 | `csv_unordered` | Set-based CSV comparison (order doesn't matter) |
 | `field_subset` | Check that expected fields exist in output (extra fields OK) |
 | `file_hash` | Byte-identical SHA-256 comparison |
+| `text_exact` | Whitespace-normalized exact text equality |
+| `text_contains` | Check if expected text appears as substring (supports `re:` prefix for regex) |
 | `custom` | Run a user-provided script (requires `custom_script`) |
 
 See [Comparators](#21-comparators) for detailed descriptions.
@@ -935,7 +951,7 @@ See [Comparators](#21-comparators) for detailed descriptions.
 
 ### Default Models
 
-SkillEval ships with a default model catalog covering 3 providers and 10 models:
+SkillEval ships with a default model catalog covering 5 providers and 14 models:
 
 #### Qwen (DashScope)
 
@@ -961,6 +977,20 @@ SkillEval ships with a default model catalog covering 3 providers and 10 models:
 | `MiniMax-M2.5` | Frontier | $0.30 | $1.20 | 200K |
 | `MiniMax-M2` | Mid | $0.26 | $1.00 | 200K |
 | `MiniMax-Text-01` | Budget | $0.20 | $1.10 | 200K |
+
+#### OpenAI
+
+| Model | Tier | Input $/M | Output $/M | Context |
+|-------|------|-----------|------------|---------|
+| `gpt-4o` | Frontier | $2.50 | $10.00 | 128K |
+| `gpt-4o-mini` | Budget | $0.15 | $0.60 | 128K |
+
+#### DeepSeek
+
+| Model | Tier | Input $/M | Output $/M | Context |
+|-------|------|-----------|------------|---------|
+| `deepseek-chat` | General | $0.14 | $0.28 | 128K |
+| `deepseek-reasoner` | Reasoning | $0.55 | $2.19 | 128K |
 
 ### Catalog Resolution Order
 
@@ -1004,6 +1034,8 @@ Each entry requires:
 | Qwen (DashScope) | `DASHSCOPE_API_KEY` | https://dashscope.console.aliyun.com/ |
 | GLM (Zhipu AI) | `ZHIPU_API_KEY` | https://open.bigmodel.cn/ |
 | MiniMax | `MINIMAX_API_KEY` | https://platform.minimax.io/ |
+| OpenAI | `OPENAI_API_KEY` | https://platform.openai.com/ |
+| DeepSeek | `DEEPSEEK_API_KEY` | https://platform.deepseek.com/ |
 
 Only models whose `env_key` variable is set in the environment are considered "available." When you run without `--models`, only available models are used.
 
@@ -1157,6 +1189,45 @@ $.items: expected array length 2, got 3
 Hash mismatch for output.txt:
   expected: a1b2c3d4e5f6...
   got:      x9y8z7w6v5u4...
+```
+
+### `text_exact`
+
+**Whitespace-normalized exact text equality.**
+
+- Strips leading/trailing whitespace from both texts.
+- Collapses consecutive whitespace characters into a single space.
+- After normalization, checks for exact string equality.
+- Shows a unified diff on failure for easy debugging.
+
+**Best for:** Plain text output where minor whitespace variations (extra spaces, trailing newlines) are acceptable but the actual content must match exactly.
+
+**Example diff on failure:**
+```
+--- expected
++++ actual
+@@ -1,3 +1,3 @@
+ The capital of France
+-is Paris.
++is Lyon.
+```
+
+### `text_contains`
+
+**Substring check with optional regex support.**
+
+- Checks if the expected text appears as a substring in the model's output.
+- Supports regex patterns when the expected value is prefixed with `re:` (e.g., `re:\d{4}-\d{2}-\d{2}` to match a date pattern).
+- Without `re:` prefix, performs a plain substring search.
+- Both expected and actual text are stripped of leading/trailing whitespace before comparison.
+
+**Best for:** Tasks where the model's output should include specific text or match a pattern, but may also contain additional content (e.g., checking that an answer contains a key phrase).
+
+**Example diff on failure:**
+```
+Expected substring not found in output:
+  expected: "Paris"
+  output:   "The capital of France is Lyon, a major city."
 ```
 
 ### `custom`
