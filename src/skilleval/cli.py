@@ -77,7 +77,9 @@ def _write_run_csv(results: list[ModelResult]) -> str:
     """Serialize Mode 1 results to CSV."""
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
-    writer.writerow(["model", "pass_rate", "avg_cost", "avg_latency", "total_cost"])
+    writer.writerow(
+        ["model", "pass_rate", "avg_cost", "avg_latency", "total_cost", "context_window"]
+    )
     for r in sorted(results, key=lambda x: (-x.pass_rate, x.avg_cost)):
         writer.writerow(
             [
@@ -86,6 +88,7 @@ def _write_run_csv(results: list[ModelResult]) -> str:
                 f"{r.avg_cost:.6f}",
                 f"{r.avg_latency:.2f}",
                 f"{r.total_cost:.6f}",
+                r.context_window,
             ]
         )
     return buf.getvalue()
@@ -95,7 +98,9 @@ def _write_matrix_csv(cells: list) -> str:
     """Serialize Mode 2 matrix results to CSV."""
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
-    writer.writerow(["creator", "executor", "pass_rate", "avg_cost", "total_cost"])
+    writer.writerow(
+        ["creator", "executor", "pass_rate", "avg_cost", "total_cost", "context_window"]
+    )
     for c in cells:
         writer.writerow(
             [
@@ -104,6 +109,7 @@ def _write_matrix_csv(cells: list) -> str:
                 f"{c.result.pass_rate:.4f}",
                 f"{c.result.avg_cost:.6f}",
                 f"{c.result.total_cost:.6f}",
+                c.result.context_window,
             ]
         )
     return buf.getvalue()
@@ -113,7 +119,17 @@ def _write_chain_csv(cells: list) -> str:
     """Serialize Mode 3 chain results to CSV."""
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
-    writer.writerow(["meta_skill", "creator", "executor", "pass_rate", "avg_cost", "total_cost"])
+    writer.writerow(
+        [
+            "meta_skill",
+            "creator",
+            "executor",
+            "pass_rate",
+            "avg_cost",
+            "total_cost",
+            "context_window",
+        ]
+    )
     for c in cells:
         writer.writerow(
             [
@@ -123,6 +139,7 @@ def _write_chain_csv(cells: list) -> str:
                 f"{c.result.pass_rate:.4f}",
                 f"{c.result.avg_cost:.6f}",
                 f"{c.result.total_cost:.6f}",
+                c.result.context_window,
             ]
         )
     return buf.getvalue()

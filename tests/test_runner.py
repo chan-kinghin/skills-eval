@@ -105,6 +105,7 @@ def _make_model_result(
     model: str,
     pass_rate: float,
     avg_cost: float,
+    context_window: int = 0,
 ) -> ModelResult:
     return ModelResult(
         model=model,
@@ -113,6 +114,7 @@ def _make_model_result(
         avg_cost=avg_cost,
         avg_latency=0.0,
         total_cost=0.0,
+        context_window=context_window,
     )
 
 
@@ -167,3 +169,40 @@ class TestComputeRecommendation:
         rec = _compute_recommendation(_to_candidates(results), num_trials=10)
         assert rec is not None
         assert "good" in rec
+
+    def test_tiebreaker_prefers_larger_context_at_equal_cost(self):
+        results = [
+            _make_model_result("small-ctx", 1.0, 0.005, context_window=32_000),
+            _make_model_result("large-ctx", 1.0, 0.005, context_window=128_000),
+        ]
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
+        assert rec is not None
+        assert "large-ctx" in rec
+
+    def test_recommendation_includes_context_window_info(self):
+        results = [_make_model_result("m1", 1.0, 0.005, context_window=131_072)]
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
+        assert rec is not None
+        assert "131,072 ctx" in rec
+
+    def test_recommendation_no_context_when_zero(self):
+        results = [_make_model_result("m1", 1.0, 0.005, context_window=0)]
+        rec = _compute_recommendation(_to_candidates(results), num_trials=10)
+        assert rec is not None
+        assert "ctx" not in rec
+
+
+class TestAggregateTrialsContextWindow:
+    def test_aggregate_with_context_window(self):
+        trials = [make_trial(passed=True, cost=0.002, latency=0.5)]
+        result = _aggregate_trials("m", trials, context_window=64_000)
+        assert result.context_window == 64_000
+
+    def test_aggregate_without_context_window_defaults_to_zero(self):
+        trials = [make_trial(passed=True, cost=0.002, latency=0.5)]
+        result = _aggregate_trials("m", trials)
+        assert result.context_window == 0
+
+    def test_aggregate_empty_with_context_window(self):
+        result = _aggregate_trials("m", [], context_window=128_000)
+        assert result.context_window == 128_000

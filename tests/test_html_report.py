@@ -21,6 +21,7 @@ def _mr(
     avg_cost=0.0,
     avg_latency=0.0,
     total_cost=0.0,
+    context_window: int = 0,
 ) -> ModelResult:
     return ModelResult(
         model=model,
@@ -29,6 +30,7 @@ def _mr(
         avg_cost=avg_cost,
         avg_latency=avg_latency,
         total_cost=total_cost,
+        context_window=context_window,
     )
 
 
@@ -49,7 +51,15 @@ def test_generate_html_report_run_mode(tmp_path: Path) -> None:
         cost=0.001,
         latency_seconds=0.5,
     )
-    r1 = _mr("modelA", 1.0, [t1, t2], avg_cost=0.001, avg_latency=0.45, total_cost=0.002)
+    r1 = _mr(
+        "modelA",
+        1.0,
+        [t1, t2],
+        avg_cost=0.001,
+        avg_latency=0.45,
+        total_cost=0.002,
+        context_window=131_072,
+    )
 
     u1 = TrialResult(
         model="modelB",
@@ -87,6 +97,8 @@ def test_generate_html_report_run_mode(tmp_path: Path) -> None:
     assert "Per-Model Trials" in html
     assert "modelA" in html and "modelB" in html
     assert "details" in html  # collapsible sections
+    assert "131,072" in html  # context window for modelA
+    assert "Context" in html  # context column header
 
 
 def test_generate_html_report_matrix_mode(tmp_path: Path) -> None:

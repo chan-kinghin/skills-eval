@@ -54,7 +54,9 @@ def _save_and_compare(
         return comparator.compare(tmp_dir, task.path / "expected")
 
 
-def _aggregate_trials(model_name: str, trials: list[TrialResult]) -> ModelResult:
+def _aggregate_trials(
+    model_name: str, trials: list[TrialResult], context_window: int = 0
+) -> ModelResult:
     """Aggregate individual trials into a ModelResult."""
     if not trials:
         return ModelResult(
@@ -64,6 +66,7 @@ def _aggregate_trials(model_name: str, trials: list[TrialResult]) -> ModelResult
             avg_cost=0.0,
             avg_latency=0.0,
             total_cost=0.0,
+            context_window=context_window,
         )
 
     passed = sum(1 for t in trials if t.passed)
@@ -78,6 +81,7 @@ def _aggregate_trials(model_name: str, trials: list[TrialResult]) -> ModelResult
         avg_cost=total_cost / n,
         avg_latency=total_latency / n,
         total_cost=total_cost,
+        context_window=context_window,
     )
 
 
@@ -97,13 +101,18 @@ def _compute_recommendation(
 
     *candidates* is a list of ``(label, ModelResult)`` pairs where *label*
     is a human-readable identifier (model name, creator→executor pair, etc.).
+
+    At equal cost, prefers the model with a larger context window.
     """
     perfect = [(label, r) for label, r in candidates if r.pass_rate == 1.0]
     if not perfect:
         return None
 
-    label, result = min(perfect, key=lambda pair: pair[1].avg_cost)
+    # Sort by cost ascending, then context_window descending (prefer larger)
+    label, result = min(perfect, key=lambda pair: (pair[1].avg_cost, -pair[1].context_window))
     rec = f"{label} (${result.avg_cost:.6f}/run)"
+    if result.context_window > 0:
+        rec += f" [{result.context_window:,} ctx]"
     if num_trials < 10:
         rec += " [warning: trials < 10, consider increasing for confidence]"
     return rec
@@ -221,7 +230,11 @@ async def run_mode1(
             },
         )
 
-    model_results = [_aggregate_trials(name, trials) for name, trials in model_trials.items()]
+    ctx_lookup = {m.name: m.context_window for m in models}
+    model_results = [
+        _aggregate_trials(name, trials, context_window=ctx_lookup.get(name, 0))
+        for name, trials in model_trials.items()
+    ]
     candidates = [(r.model, r) for r in model_results]
     recommendation = _compute_recommendation(candidates, task.config.trials)
 
@@ -380,9 +393,10 @@ async def run_mode2(
             },
         )
 
+    ctx_lookup = {m.name: m.context_window for m in creators + executors}
     matrix_results: list[MatrixCell] = []
     for (cr_name, ex_name), trials in pair_trials.items():
-        model_result = _aggregate_trials(ex_name, trials)
+        model_result = _aggregate_trials(ex_name, trials, context_window=ctx_lookup.get(ex_name, 0))
         matrix_results.append(
             MatrixCell(
                 creator=cr_name,
@@ -567,9 +581,10 @@ async def run_mode3(
             },
         )
 
+    ctx_lookup = {m.name: m.context_window for m in creators + executors}
     chain_results: list[ChainCell] = []
     for (ms_name, cr_name, ex_name), trials in chain_trials.items():
-        model_result = _aggregate_trials(ex_name, trials)
+        model_result = _aggregate_trials(ex_name, trials, context_window=ctx_lookup.get(ex_name, 0))
         chain_results.append(
             ChainCell(
                 meta_skill_name=ms_name,

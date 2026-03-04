@@ -14,6 +14,7 @@ display:
     input_cost: "Input $/M"
     output_cost: "Output $/M"
     context: "Context"
+    context_window: "Context Window"
     env_var: "Env Var"
     status: "Status"
     ready: "Ready"

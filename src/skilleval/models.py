@@ -127,6 +127,7 @@ class ModelResult(BaseModel):
     avg_cost: float
     avg_latency: float
     total_cost: float
+    context_window: int = 0
 
 
 class MatrixCell(BaseModel):

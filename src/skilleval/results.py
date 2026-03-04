@@ -94,29 +94,36 @@ class ResultWriter:
         if summary.model_results:
             lines.append("Model Results:")
             for mr in sorted(summary.model_results, key=lambda r: (-r.pass_rate, r.avg_cost)):
+                ctx_part = f", {mr.context_window:,} ctx" if mr.context_window > 0 else ""
                 lines.append(
                     f"  {mr.model}: {mr.pass_rate * 100:.0f}% pass, "
-                    f"${mr.avg_cost:.6f}/run, {mr.avg_latency:.2f}s avg"
+                    f"${mr.avg_cost:.6f}/run, {mr.avg_latency:.2f}s avg{ctx_part}"
                 )
             lines.append("")
 
         if summary.matrix_results:
             lines.append("Matrix Results:")
             for mc in summary.matrix_results:
+                ctx_part = (
+                    f", {mc.result.context_window:,} ctx" if mc.result.context_window > 0 else ""
+                )
                 lines.append(
                     f"  {mc.creator} -> {mc.executor}: "
                     f"{mc.result.pass_rate * 100:.0f}% pass, "
-                    f"${mc.result.avg_cost:.6f}/run"
+                    f"${mc.result.avg_cost:.6f}/run{ctx_part}"
                 )
             lines.append("")
 
         if summary.chain_results:
             lines.append("Chain Results:")
             for cc in summary.chain_results:
+                ctx_part = (
+                    f", {cc.result.context_window:,} ctx" if cc.result.context_window > 0 else ""
+                )
                 lines.append(
                     f"  {cc.meta_skill_name} / {cc.creator} -> {cc.executor}: "
                     f"{cc.result.pass_rate * 100:.0f}% pass, "
-                    f"${cc.result.avg_cost:.6f}/run"
+                    f"${cc.result.avg_cost:.6f}/run{ctx_part}"
                 )
             lines.append("")
 

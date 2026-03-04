@@ -210,9 +210,11 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
         "<thead><tr>"
         '<th>Model</th><th>Pass Rate</th><th class="num">Avg Cost</th>'
         '<th class="num">Avg Latency</th><th class="num">Total Cost</th>'
+        '<th class="num">Context</th>'
         "</tr></thead><tbody>"
     )
     for r in results:
+        ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
         parts.append(
             "<tr>"
             f"<td>{escape(r.model)}</td>"
@@ -220,6 +222,7 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
             f'<td class="num">${r.avg_cost:.6f}</td>'
             f'<td class="num">{r.avg_latency:.2f}s</td>'
             f'<td class="num">${r.total_cost:.6f}</td>'
+            f'<td class="num">{ctx_str}</td>'
             "</tr>"
         )
     parts.append("</tbody></table></div>")
@@ -240,10 +243,11 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
 
 
 def _render_trials_block(r: ModelResult) -> str:
+    ctx_part = f", {r.context_window:,} ctx" if r.context_window > 0 else ""
     header = (
         f"{escape(r.model)} — {r.pass_rate * 100:.0f}% | "
         f"avg ${r.avg_cost:.6f}/run, {r.avg_latency:.2f}s avg latency, "
-        f"${r.total_cost:.6f} total"
+        f"${r.total_cost:.6f} total{ctx_part}"
     )
     rows = [
         "<table>",
@@ -357,10 +361,12 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
         parts.append("<table>")
         parts.append(
             "<thead><tr><th>Creator</th><th>Executor</th><th>Pass Rate</th>"
-            '<th class="num">Avg Cost</th><th class="num">Avg Latency</th></tr></thead><tbody>'
+            '<th class="num">Avg Cost</th><th class="num">Avg Latency</th>'
+            '<th class="num">Context</th></tr></thead><tbody>'
         )
         for c in items:
             r = c.result
+            ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
             parts.append(
                 "<tr>"
                 f"<td>{escape(c.creator)}</td>"
@@ -368,6 +374,7 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
                 f"<td>{r.pass_rate * 100:.0f}%</td>"
                 f'<td class="num">${r.avg_cost:.6f}</td>'
                 f'<td class="num">{r.avg_latency:.2f}s</td>'
+                f'<td class="num">{ctx_str}</td>'
                 "</tr>"
             )
         parts.append("</tbody></table>")

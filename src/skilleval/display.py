@@ -35,6 +35,7 @@ def display_run_results(results: list[ModelResult], recommendation: str | None) 
     table.add_column(t("display.tables.avg_cost"), justify="right")
     table.add_column(t("display.tables.avg_latency"), justify="right")
     table.add_column(t("display.tables.total_cost"), justify="right")
+    table.add_column(t("display.tables.context_window"), justify="right")
     table.add_column(t("display.tables.rec"), justify="center")
 
     sorted_results = sorted(results, key=lambda r: (-r.pass_rate, r.avg_cost))
@@ -52,12 +53,15 @@ def display_run_results(results: list[ModelResult], recommendation: str | None) 
         row_style = "on green" if is_rec else ""
         rec_mark = "*" if is_rec else ""
 
+        ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
+
         table.add_row(
             r.model,
             Text(rate_pct, style=rate_style),
             f"${r.avg_cost:.6f}",
             f"{r.avg_latency:.2f}s",
             f"${r.total_cost:.6f}",
+            ctx_str,
             rec_mark,
             style=row_style,
         )
