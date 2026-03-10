@@ -2,6 +2,8 @@
 
 [English](README.md) | [中文](README_ZH.md)
 
+[![PyPI version](https://img.shields.io/pypi/v/skilleval.svg)](https://pypi.org/project/skilleval/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/skilleval.svg)](https://pypi.org/project/skilleval/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -12,7 +14,7 @@ SkillEval 是一个 CLI 工具，用于自动化评估大语言模型在确定�
 ## 快速开始
 
 ```bash
-pip install -e .
+pip install skilleval
 
 # 设置至少一个供应商的 API 密钥
 export DASHSCOPE_API_KEY="sk-..."   # 通义千问（阿里云 DashScope）

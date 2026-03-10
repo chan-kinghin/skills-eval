@@ -2,6 +2,8 @@
 
 [English](README.md) | [中文](README_ZH.md)
 
+[![PyPI version](https://img.shields.io/pypi/v/skilleval.svg)](https://pypi.org/project/skilleval/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/skilleval.svg)](https://pypi.org/project/skilleval/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
@@ -12,7 +14,7 @@ SkillEval is a CLI tool that automates LLM evaluation for deterministic tasks. I
 ## Quick Start
 
 ```bash
-pip install -e .
+pip install skilleval
 
 # Set at least one provider API key
 export DASHSCOPE_API_KEY="sk-..."   # Qwen (Alibaba DashScope)
