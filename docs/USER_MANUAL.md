@@ -79,22 +79,12 @@ All providers use OpenAI-compatible chat completion APIs.
 pip install skilleval
 ```
 
-### Install from Source
-
-```bash
-# Clone the repository
-git clone <repo-url> && cd skills-eval
-
-# Install in editable mode
-pip install -e .
-```
-
 ### Install with Document Extraction Support
 
 To process PDF, Word, and Excel input files, install the optional `docs` dependencies:
 
 ```bash
-pip install -e ".[docs]"
+pip install "skilleval[docs]"
 ```
 
 This installs:
@@ -1065,7 +1055,7 @@ SkillEval extracts text from input files and formats them for the LLM. The follo
 | `.html` | HTML pages |
 | `.yaml`, `.yml` | YAML data |
 
-### Document Formats (Require `pip install -e ".[docs]"`)
+### Document Formats (Require `pip install "skilleval[docs]"`)
 
 | Extension | Library | Description |
 |-----------|---------|-------------|
@@ -1809,7 +1799,7 @@ ls my-task/meta-skill-*.md
 
 **Fix:**
 ```bash
-pip install -e ".[docs]"
+pip install "skilleval[docs]"
 # Or individually:
 pip install pdfplumber python-docx openpyxl
 ```

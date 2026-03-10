@@ -29,7 +29,7 @@
 
 ```bash
 # 安装
-pip install -e .
+pip install skilleval
 
 # 设置 API 密钥（设哪个就测哪家）
 export DASHSCOPE_API_KEY="sk-..."
@@ -74,8 +74,7 @@ SkillEval 不是一个玩具项目。它考虑了实际生产环境的需求：
 ## 快速开始（5 行搞定）
 
 ```bash
-git clone https://github.com/chan-kinghin/skills-eval && cd skills-eval
-pip install -e .
+pip install skilleval
 export DASHSCOPE_API_KEY="sk-..."        # 或 ZHIPU_API_KEY / MINIMAX_API_KEY
 skilleval init my-task                    # 创建任务模板
 # 编辑 input/、expected/、skill.md 后：

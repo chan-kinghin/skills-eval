@@ -25,7 +25,7 @@ SkillEval is an open-source CLI tool that automates LLM model selection for dete
 It runs your task across multiple models in parallel, compares every output against your expected result, and tells you which model is cheapest at 100% accuracy.
 
 ```bash
-pip install -e .
+pip install skilleval
 export DASHSCOPE_API_KEY="sk-..."
 skilleval init my-task
 # Add your input files, expected output, and prompt
@@ -91,8 +91,7 @@ skilleval run my-task \
 
 ```bash
 # Install
-git clone https://github.com/chan-kinghin/skills-eval && cd skills-eval
-pip install -e .
+pip install skilleval
 
 # Set up a provider (pick at least one)
 export DASHSCOPE_API_KEY="sk-..."   # Qwen

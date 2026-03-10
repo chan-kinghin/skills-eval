@@ -56,7 +56,7 @@ Plus: HTML reports, JSON output for CI/CD, run comparison, Ctrl+C saves partial 
 MIT licensed, Python 3.11+, install in 30 seconds:
 
 ```
-pip install -e .
+pip install skilleval
 skilleval init my-task
 skilleval run my-task/
 ```
@@ -117,7 +117,7 @@ The idea is simple: you provide input files, expected output, and a prompt. The 
 **Price range in default catalog:** Free (glm-4.5-flash) to $6.40/M output tokens (qwen-max). In my testing, the free or budget-tier models often pass on simple extraction tasks.
 
 ```bash
-pip install -e .
+pip install skilleval
 skilleval init my-task
 # add input files, expected output, edit skill.md
 skilleval run my-task/
