@@ -16,6 +16,10 @@ src/skilleval/_version.py
 # Environment
 .env
 
+# Test coverage
+.coverage
+htmlcov/
+
 # Linter cache
 .ruff_cache/
 

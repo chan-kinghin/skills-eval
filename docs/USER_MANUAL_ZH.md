@@ -310,6 +310,8 @@ SkillEval 显示的表格包含以下列：
 | Avg Cost | 每次试验的平均费用（美元） |
 | Avg Latency | 平均响应时间（秒） |
 | Total Cost | 所有试验的总费用 |
+| Context Window | 模型的最大上下文长度（token 数） |
+| Lint Score | 技能质量评分 0-100（仅在 `--skill-format claude` 时显示） |
 | Rec | 星号（`*`）表示推荐模型 |
 
 ### 要求

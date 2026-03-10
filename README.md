@@ -45,7 +45,7 @@ skilleval run my-task/ --json | jq '.recommendation'
 ## Additional Features
 
 - **Ad-hoc endpoints** — Use any OpenAI-compatible API without editing the catalog: `--endpoint`, `--api-key`, `--model-name`.
-- **Skill linting (`lint`)** — Validate Claude Code skill structure (frontmatter, phases, references, code blocks).
+- **Skill linting (`lint` / `--skill-format claude`)** — Validate Claude Code skill structure (frontmatter, phases, references, code blocks). Use `--skill-format claude` on `run`/`matrix`/`chain` to get a `lint_score` (0-100) alongside pass rate.
 - **Skill testing (`skill-test`)** — Test a skill's core prompt logic against expected outputs.
 - **Run comparison (`compare`)** — Diff two runs to detect improvements or regressions.
 - **HTML reports (`report --html`)** — Generate self-contained HTML reports for sharing.
@@ -55,8 +55,11 @@ skilleval run my-task/ --json | jq '.recommendation'
 - **Config validation** — Warns on unknown keys in `config.yaml` and validates comparator names at load time.
 - **Circuit breaker** — Automatically skips a provider after 5 consecutive failures, avoiding wasted time and cost.
 - **Ctrl+C handling** — Saves partial results on interrupt so you never lose a half-finished run.
+- **Interactive TUI** — Launch `skilleval` with no arguments for a guided interactive mode.
+- **Context window tracking** — Results include each model's context window size for informed comparisons.
+- **Internationalization** — Full English and Chinese UI support (`language: zh` in settings or `LANG` env var).
 - **Friendly errors** — No raw tracebacks by default; use `-vv` to see full stack traces when debugging.
-- **Progress bar** — Now shows elapsed time and ETA alongside the completion percentage.
+- **Progress bar** — Shows elapsed time and ETA alongside the completion percentage.
 
 ## Documentation
 

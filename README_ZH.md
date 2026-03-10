@@ -45,7 +45,7 @@ skilleval run my-task/ --json | jq '.recommendation'
 ## 附加功能
 
 - **临时端点** — 无需修改模型目录即可使用任何 OpenAI 兼容 API：`--endpoint`、`--api-key`、`--model-name`。
-- **技能检查（`lint`）** — 验证 Claude Code 技能结构（frontmatter、阶段、引用、代码块）。
+- **技能检查（`lint` / `--skill-format claude`）** — 验证 Claude Code 技能结构（frontmatter、阶段、引用、代码块）。在 `run`/`matrix`/`chain` 上使用 `--skill-format claude` 可同时获得 `lint_score`（0-100）。
 - **技能测试（`skill-test`）** — 将技能的核心提示逻辑与预期输出进行测试。
 - **运行比较（`compare`）** — 对比两次运行结果以检测改进或退化。
 - **HTML 报告（`report --html`）** — 生成独立的 HTML 报告以便分享。
@@ -55,8 +55,11 @@ skilleval run my-task/ --json | jq '.recommendation'
 - **配置校验** — 对 `config.yaml` 中的未知键发出警告，并在加载时验证比较器名称。
 - **熔断机制** — 某个供应商连续失败 5 次后自动跳过，避免浪费时间和费用。
 - **Ctrl+C 处理** — 中断时保存已有结果，避免丢失未完成的运行数据。
+- **交互式 TUI** — 不带参数运行 `skilleval` 即可进入引导式交互模式。
+- **上下文窗口追踪** — 结果包含每个模型的上下文窗口大小，便于比较。
+- **国际化** — 完整支持中英文界面（在设置中配置 `language: zh` 或通过 `LANG` 环境变量）。
 - **友好的错误提示** — 默认不显示原始堆栈信息；使用 `-vv` 可查看完整的错误追踪。
-- **进度条** — 现在显示已用时间和预计剩余时间。
+- **进度条** — 显示已用时间和预计剩余时间。
 
 ## 文档
 

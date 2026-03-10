@@ -17,7 +17,7 @@ pip install -e ".[dev,docs]"
 ## Running Tests and Linter
 
 ```bash
-pytest                    # run 200+ offline tests (no API keys needed)
+pytest                    # run 300+ offline tests (no API keys needed)
 pytest --cov=skilleval    # run tests with coverage
 ruff check src/ tests/    # lint
 ```
@@ -50,6 +50,8 @@ src/skilleval/
     ├── csv_unordered.py# Multiset (Counter-based) CSV match
     ├── field_subset.py # Recursive expected ⊆ output check
     ├── file_hash.py    # SHA-256 byte-identical comparison
+    ├── text_exact.py   # Exact text match (whitespace-normalized)
+    ├── text_contains.py# Substring containment check
     └── custom.py       # Run external script for comparison
 ```
 

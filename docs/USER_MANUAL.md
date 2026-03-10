@@ -310,6 +310,8 @@ SkillEval displays a table with columns:
 | Avg Cost | Average cost per trial in USD |
 | Avg Latency | Average response time in seconds |
 | Total Cost | Total cost across all trials |
+| Context Window | Model's maximum context length (tokens) |
+| Lint Score | Skill quality score 0-100 (only with `--skill-format claude`) |
 | Rec | Asterisk (`*`) if this is the recommended model |
 
 ### Requirements

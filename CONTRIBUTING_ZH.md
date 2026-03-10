@@ -17,7 +17,7 @@ pip install -e ".[dev,docs]"
 ## 运行测试和代码检查
 
 ```bash
-pytest                    # 运行 200+ 离线测试（无需 API 密钥）
+pytest                    # 运行 300+ 离线测试（无需 API 密钥）
 pytest --cov=skilleval    # 运行测试并生成覆盖率报告
 ruff check src/ tests/    # 代码风格检查
 ```
@@ -50,6 +50,8 @@ src/skilleval/
     ├── csv_unordered.py# 多重集（Counter）CSV 匹配
     ├── field_subset.py # 递归的"预期 ⊆ 输出"子集检查
     ├── file_hash.py    # SHA-256 字节级比较
+    ├── text_exact.py   # 精确文本匹配（规范化空白）
+    ├── text_contains.py# 子串包含检查
     └── custom.py       # 运行外部脚本进行比较
 ```
 
