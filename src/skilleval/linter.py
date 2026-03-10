@@ -69,7 +69,27 @@ def lint_skill(skill_dir: Path) -> LintReport:
         issues.append(LintIssue("error", f"Failed to read skill file: {e}"))
         return _finalize_report(issues, skill_file)
 
-    # 3) Extract frontmatter and body
+    # Delegate to shared logic, with skill_dir for reference checking
+    report = _lint_content(text, skill_dir=skill_dir)
+    report.skill_path = skill_file
+    return report
+
+
+def lint_skill_text(text: str) -> LintReport:
+    """Lint skill text directly (no filesystem needed).
+
+    Same checks as ``lint_skill`` except reference-link validation is skipped
+    because there is no directory to resolve paths against.
+    """
+    return _lint_content(text, skill_dir=None)
+
+
+def _lint_content(text: str, skill_dir: Path | None = None) -> LintReport:
+    """Shared lint logic used by both ``lint_skill`` and ``lint_skill_text``."""
+
+    issues: list[LintIssue] = []
+
+    # 1) Extract frontmatter and body
     fm, fm_end_line, body, body_start_line = extract_frontmatter(text)
     if fm is None:
         issues.append(
@@ -89,11 +109,11 @@ def lint_skill(skill_dir: Path) -> LintReport:
                     LintIssue("error", "Frontmatter missing required field: description", line=1)
                 )
 
-    # 4) Parse body for headings and code blocks (ignoring code fence contents for headings)
+    # 2) Parse body for headings and code blocks (ignoring code fence contents for headings)
     headings = collect_headings(body, base_line=body_start_line)
     code_blocks = _collect_code_blocks(body, base_line=body_start_line)
 
-    # 5) Phase/step structure
+    # 3) Phase/step structure
     if not _has_numbered_phases(headings):
         issues.append(
             LintIssue(
@@ -102,7 +122,7 @@ def lint_skill(skill_dir: Path) -> LintReport:
             )
         )
 
-    # 6) Required sections: Error Handling and Rules
+    # 4) Required sections: Error Handling and Rules
     if not _has_error_handling_section(headings):
         issues.append(
             LintIssue("warning", "Missing an Error Handling section (## Error Handling).")
@@ -112,11 +132,12 @@ def lint_skill(skill_dir: Path) -> LintReport:
             LintIssue("warning", "Missing a Rules section (## Rules or ## Important Rules).")
         )
 
-    # 7) Reference links
-    missing_refs = _check_references_safe(skill_dir, body, base_line=body_start_line)
-    issues.extend(missing_refs)
+    # 5) Reference links — only when a directory is available
+    if skill_dir is not None:
+        missing_refs = _check_references_safe(skill_dir, body, base_line=body_start_line)
+        issues.extend(missing_refs)
 
-    # 8) Code block validation
+    # 6) Code block validation
     for block in code_blocks:
         if block.language in {"python", "py"}:
             err = _check_python_block(block.code)
@@ -139,9 +160,8 @@ def lint_skill(skill_dir: Path) -> LintReport:
                     )
                 )
 
-    # 9) Compute quality score
-    report = _finalize_report(issues, skill_file)
-    return report
+    # 7) Compute quality score
+    return _finalize_report(issues, None)
 
 
 # -----------------------------

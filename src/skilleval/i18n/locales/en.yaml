@@ -42,6 +42,7 @@ display:
     test_case: "Test Case"
     cases_passing: "Cases Passing"
     overall_summary: "Overall Summary per Model"
+    lint_score: "Lint"
     latest: "(latest)"
 
   messages:
@@ -171,6 +172,7 @@ tui:
     old_run: "Old run path"
     new_run: "New run path"
     task_name: "Task name"
+    skill_format: "Skill format (plain/claude)"
 
   language:
     current: "Current language: {lang}"

@@ -793,9 +793,12 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 **Resuming a run:** Pass `--resume <run_dir>` to skip models that completed in a previous run. SkillEval reads `checkpoint.json` from the given directory and skips any models listed in `completed_models`.
+
+**Skill format:** With `--skill-format claude`, Mode 1 lints the skill.md against Claude Code skill conventions, strips tool scaffolding, and reports a `lint_score` (0-100) alongside `pass_rate` in results.
 
 ### `skilleval matrix`
 
@@ -811,6 +814,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval chain`
@@ -829,6 +833,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
+| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval catalog`

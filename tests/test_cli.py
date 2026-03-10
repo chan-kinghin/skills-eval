@@ -80,7 +80,9 @@ class TestOutputFormatHelpers:
         csv_out = _write_run_csv(results)
         lines = csv_out.strip().split("\n")
 
-        assert lines[0] == "model,pass_rate,avg_cost,avg_latency,total_cost,context_window"
+        assert (
+            lines[0] == "model,pass_rate,avg_cost,avg_latency,total_cost,context_window,lint_score"
+        )
         assert len(lines) == 3  # header + 2 rows
         # Sorted by -pass_rate, then avg_cost
         assert lines[1].startswith("cheap-model")
@@ -109,7 +111,9 @@ class TestOutputFormatHelpers:
         csv_out = _write_matrix_csv(cells)
         lines = csv_out.strip().split("\n")
 
-        assert lines[0] == "creator,executor,pass_rate,avg_cost,total_cost,context_window"
+        assert (
+            lines[0] == "creator,executor,pass_rate,avg_cost,total_cost,context_window,lint_score"
+        )
         assert "creator-a" in lines[1]
         assert "executor-b" in lines[1]
 
@@ -138,7 +142,8 @@ class TestOutputFormatHelpers:
         lines = csv_out.strip().split("\n")
 
         assert (
-            lines[0] == "meta_skill,creator,executor,pass_rate,avg_cost,total_cost,context_window"
+            lines[0]
+            == "meta_skill,creator,executor,pass_rate,avg_cost,total_cost,context_window,lint_score"
         )
         assert "ms-v1" in lines[1]
 

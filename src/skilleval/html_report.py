@@ -203,22 +203,28 @@ def _render_run_mode(results: list[ModelResult], recommendation: str | None) -> 
     parts.append("</div>")
 
     # Cost comparison table
+    has_lint = any(r.lint_score is not None for r in results)
     parts.append('<h3 style="margin-top:16px;">Cost Comparison</h3>')
     parts.append('<div style="overflow:auto;">')
+    lint_th = '<th class="num">Lint</th>' if has_lint else ""
     parts.append(
         "<table>"
         "<thead><tr>"
-        '<th>Model</th><th>Pass Rate</th><th class="num">Avg Cost</th>'
+        "<th>Model</th><th>Pass Rate</th>"
+        f"{lint_th}"
+        '<th class="num">Avg Cost</th>'
         '<th class="num">Avg Latency</th><th class="num">Total Cost</th>'
         '<th class="num">Context</th>'
         "</tr></thead><tbody>"
     )
     for r in results:
         ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
+        lint_td = f'<td class="num">{r.lint_score}</td>' if has_lint else ""
         parts.append(
             "<tr>"
             f"<td>{escape(r.model)}</td>"
             f"<td>{r.pass_rate * 100:.0f}%</td>"
+            f"{lint_td}"
             f'<td class="num">${r.avg_cost:.6f}</td>'
             f'<td class="num">{r.avg_latency:.2f}s</td>'
             f'<td class="num">${r.total_cost:.6f}</td>'
@@ -355,23 +361,28 @@ def _render_chain_mode(cells: list[ChainCell]) -> str:
         )
 
     # Grouped results by meta-skill variant
+    has_lint = any(c.lint_score is not None for c in cells)
     parts.append('<h3 style="margin-top:16px;">Variant Details</h3>')
     for meta, items in sorted(by_meta.items()):
         parts.append(f"<details><summary>{escape(meta)}</summary>")
         parts.append("<table>")
+        lint_th = '<th class="num">Lint</th>' if has_lint else ""
         parts.append(
             "<thead><tr><th>Creator</th><th>Executor</th><th>Pass Rate</th>"
+            f"{lint_th}"
             '<th class="num">Avg Cost</th><th class="num">Avg Latency</th>'
             '<th class="num">Context</th></tr></thead><tbody>'
         )
         for c in items:
             r = c.result
             ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
+            lint_td = f'<td class="num">{c.lint_score}</td>' if has_lint else ""
             parts.append(
                 "<tr>"
                 f"<td>{escape(c.creator)}</td>"
                 f"<td>{escape(c.executor)}</td>"
                 f"<td>{r.pass_rate * 100:.0f}%</td>"
+                f"{lint_td}"
                 f'<td class="num">${r.avg_cost:.6f}</td>'
                 f'<td class="num">{r.avg_latency:.2f}s</td>'
                 f'<td class="num">{ctx_str}</td>'

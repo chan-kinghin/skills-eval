@@ -29,9 +29,13 @@ console = Console()
 
 def display_run_results(results: list[ModelResult], recommendation: str | None) -> None:
     """Display Mode 1 results as a sorted table."""
+    has_lint = any(r.lint_score is not None for r in results)
+
     table = Table(title=t("display.tables.evaluation_results"), show_lines=True)
     table.add_column(t("display.tables.model"), style="bold")
     table.add_column(t("display.tables.pass_rate"), justify="right")
+    if has_lint:
+        table.add_column(t("display.tables.lint_score"), justify="right")
     table.add_column(t("display.tables.avg_cost"), justify="right")
     table.add_column(t("display.tables.avg_latency"), justify="right")
     table.add_column(t("display.tables.total_cost"), justify="right")
@@ -55,16 +59,23 @@ def display_run_results(results: list[ModelResult], recommendation: str | None) 
 
         ctx_str = f"{r.context_window:,}" if r.context_window > 0 else "-"
 
-        table.add_row(
+        row: list[str | Text] = [
             r.model,
             Text(rate_pct, style=rate_style),
-            f"${r.avg_cost:.6f}",
-            f"{r.avg_latency:.2f}s",
-            f"${r.total_cost:.6f}",
-            ctx_str,
-            rec_mark,
-            style=row_style,
+        ]
+        if has_lint:
+            row.append(str(r.lint_score) if r.lint_score is not None else "\u2014")
+        row.extend(
+            [
+                f"${r.avg_cost:.6f}",
+                f"{r.avg_latency:.2f}s",
+                f"${r.total_cost:.6f}",
+                ctx_str,
+                rec_mark,
+            ]
         )
+
+        table.add_row(*row, style=row_style)
 
     console.print(table)
 
@@ -135,6 +146,13 @@ def display_matrix_results(cells: list[MatrixCell]) -> None:
                 f"(${cheapest.result.avg_cost:.6f}/run)"
             )
 
+        # Show lint scores when available
+        lint_cells = [c for c in cells if c.lint_score is not None]
+        if lint_cells:
+            console.print(f"\n[bold]{t('display.tables.lint_score')}:[/bold]")
+            for c in sorted(lint_cells, key=lambda c: (c.creator, c.executor)):
+                console.print(f"  {c.creator} -> {c.executor}: {c.lint_score}")
+
 
 def display_chain_results(cells: list[ChainCell]) -> None:
     """Display Mode 3 results with meta-skill comparison."""
@@ -173,6 +191,13 @@ def display_chain_results(cells: list[ChainCell]) -> None:
             f"{cheapest.meta_skill_name} / {cheapest.creator} -> {cheapest.executor} "
             f"(${cheapest.result.avg_cost:.6f}/run)"
         )
+
+    # Show lint scores when available
+    lint_cells = [c for c in cells if c.lint_score is not None]
+    if lint_cells:
+        console.print(f"\n[bold]{t('display.tables.lint_score')}:[/bold]")
+        for c in sorted(lint_cells, key=lambda c: (c.meta_skill_name, c.creator)):
+            console.print(f"  {c.meta_skill_name} / {c.creator} -> {c.executor}: {c.lint_score}")
 
 
 def display_catalog(models: list[ModelEntry], available: list[str]) -> None:

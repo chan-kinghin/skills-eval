@@ -128,6 +128,7 @@ class ModelResult(BaseModel):
     avg_latency: float
     total_cost: float
     context_window: int = 0
+    lint_score: int | None = None
 
 
 class MatrixCell(BaseModel):
@@ -137,6 +138,7 @@ class MatrixCell(BaseModel):
     executor: str
     generated_skill: str
     result: ModelResult
+    lint_score: int | None = None
 
 
 class ChainCell(BaseModel):
@@ -147,6 +149,7 @@ class ChainCell(BaseModel):
     executor: str
     generated_skill: str
     result: ModelResult
+    lint_score: int | None = None
 
 
 class RunSummary(BaseModel):
@@ -159,3 +162,4 @@ class RunSummary(BaseModel):
     matrix_results: list[MatrixCell] = Field(default_factory=list)
     chain_results: list[ChainCell] = Field(default_factory=list)
     recommendation: str | None = None
+    skill_format: str | None = None

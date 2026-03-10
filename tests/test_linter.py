@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from skilleval.linter import LintReport, lint_skill
+from skilleval.linter import LintReport, lint_skill, lint_skill_text
 
 
 def write(p: Path, content: str) -> None:
@@ -191,3 +191,105 @@ description: b
     # No errors expected (has phase, error handling, rules)
     errs = [i for i in report.issues if i.severity == "error"]
     assert not errs
+
+
+# ── lint_skill_text tests ─────────────────────────────────────────────
+
+
+def test_lint_skill_text_valid() -> None:
+    """Full valid skill text should score 100."""
+    text = """---
+name: test-skill
+description: A test skill for validation
+---
+
+## Phase 1 — Setup
+
+Do initial setup.
+
+```python
+x = 1 + 2
+```
+
+## Error Handling
+
+Handle errors gracefully.
+
+## Rules
+
+- Always validate inputs
+"""
+    report = lint_skill_text(text)
+    assert report.issues == []
+    assert report.quality_score == 100
+    assert report.skill_path is None  # No filesystem path
+
+
+def test_lint_skill_text_missing_frontmatter() -> None:
+    """Text without frontmatter should produce an error."""
+    text = "## Phase 1 — Do\n\nSome content.\n"
+    report = lint_skill_text(text)
+    assert any(
+        iss.severity == "error" and "Missing YAML frontmatter" in iss.message
+        for iss in report.issues
+    )
+
+
+def test_lint_skill_text_missing_name() -> None:
+    """Frontmatter missing the 'name' field should produce an error."""
+    text = """---
+description: only description
+---
+
+## Phase 1 — Do
+
+Content.
+"""
+    report = lint_skill_text(text)
+    assert any(
+        iss.severity == "error" and "Frontmatter missing required field: name" in iss.message
+        for iss in report.issues
+    )
+
+
+def test_lint_skill_text_skips_references() -> None:
+    """Broken reference links should NOT error when linting text (no directory)."""
+    text = """---
+name: a
+description: b
+---
+
+## Phase 1 — Do
+
+See [missing](references/not-there.md).
+
+## Error Handling
+## Rules
+"""
+    report = lint_skill_text(text)
+    # Reference checks are skipped — no "Missing reference file" errors
+    ref_errors = [iss for iss in report.issues if "Missing reference file" in iss.message]
+    assert ref_errors == []
+
+
+def test_lint_skill_text_catches_bad_python() -> None:
+    """Invalid Python in a code block should still be caught."""
+    text = """---
+name: a
+description: b
+---
+
+## Phase 1 — Do
+
+```python
+a = (
+```
+
+## Error Handling
+## Rules
+"""
+    report = lint_skill_text(text)
+    assert any(
+        iss.severity == "error" and iss.message.startswith("Invalid Python code block")
+        for iss in report.issues
+    )

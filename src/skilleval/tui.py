@@ -36,12 +36,15 @@ def _handle_run(ctx: click.Context, session: PromptSession) -> None:
         return
     models = _prompt_value(session, "models")
     trials = _prompt_value(session, "trials")
+    skill_format = _prompt_value(session, "skill_format", default="plain")
 
     args = ["run", task_path]
     if models:
         args.extend(["--models", models])
     if trials:
         args.extend(["--trials", trials])
+    if skill_format and skill_format != "plain":
+        args.extend(["--skill-format", skill_format])
 
     _invoke_cli(ctx, args)
 
@@ -58,10 +61,13 @@ def _handle_matrix(ctx: click.Context, session: PromptSession) -> None:
     if not executors:
         return
     trials = _prompt_value(session, "trials")
+    skill_format = _prompt_value(session, "skill_format", default="plain")
 
     args = ["matrix", task_path, "--creators", creators, "--executors", executors]
     if trials:
         args.extend(["--trials", trials])
+    if skill_format and skill_format != "plain":
+        args.extend(["--skill-format", skill_format])
 
     _invoke_cli(ctx, args)
 
@@ -81,6 +87,7 @@ def _handle_chain(ctx: click.Context, session: PromptSession) -> None:
     if not executors:
         return
     trials = _prompt_value(session, "trials")
+    skill_format = _prompt_value(session, "skill_format", default="plain")
 
     args = [
         "chain",
@@ -95,6 +102,8 @@ def _handle_chain(ctx: click.Context, session: PromptSession) -> None:
     ]
     if trials:
         args.extend(["--trials", trials])
+    if skill_format and skill_format != "plain":
+        args.extend(["--skill-format", skill_format])
 
     _invoke_cli(ctx, args)
 

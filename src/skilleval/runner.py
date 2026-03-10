@@ -165,6 +165,7 @@ async def run_mode1(
     models: list[ModelEntry],
     engine: ExecutionEngine,
     parallel: int,
+    skill_format: str = "plain",
 ) -> RunSummary:
     """Mode 1: Given skill, sweep executor models."""
     if not task.skill:
@@ -180,6 +181,18 @@ async def run_mode1(
     user_content = format_input_files(task.input_files)
     comparator_kwargs = _build_comparator_kwargs(task)
 
+    # Claude format: lint the skill and use the stripped core prompt
+    lint_score: int | None = None
+    system_prompt = task.skill
+    if skill_format == "claude":
+        from skilleval.linter import lint_skill
+        from skilleval.skill_parser import parse_skill
+
+        report = lint_skill(task.path)
+        lint_score = report.quality_score
+        skill_prompt = parse_skill(task.path)
+        system_prompt = skill_prompt.core_prompt
+
     specs: list[TrialSpec] = []
     for model in models:
         for trial_num in range(1, task.config.trials + 1):
@@ -187,7 +200,7 @@ async def run_mode1(
                 TrialSpec(
                     model=model,
                     messages=[
-                        {"role": "system", "content": task.skill},
+                        {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_content},
                     ],
                     config=task.config,
@@ -231,10 +244,12 @@ async def run_mode1(
         )
 
     ctx_lookup = {m.name: m.context_window for m in models}
-    model_results = [
-        _aggregate_trials(name, trials, context_window=ctx_lookup.get(name, 0))
-        for name, trials in model_trials.items()
-    ]
+    model_results = []
+    for name, trials in model_trials.items():
+        mr = _aggregate_trials(name, trials, context_window=ctx_lookup.get(name, 0))
+        if lint_score is not None:
+            mr.lint_score = lint_score
+        model_results.append(mr)
     candidates = [(r.model, r) for r in model_results]
     recommendation = _compute_recommendation(candidates, task.config.trials)
 
@@ -253,6 +268,7 @@ async def run_mode1(
         timestamp=datetime.now().isoformat(),
         model_results=model_results,
         recommendation=recommendation,
+        skill_format=skill_format if skill_format != "plain" else None,
     )
     await _finalize_run(writer, summary, interrupted)
     return summary
@@ -266,6 +282,7 @@ async def run_mode2(
     creators: list[ModelEntry],
     executors: list[ModelEntry],
     engine: ExecutionEngine,
+    skill_format: str = "plain",
 ) -> RunSummary:
     """Mode 2: Creator x executor matrix."""
     if not task.prompt:
@@ -285,22 +302,34 @@ async def run_mode2(
 
     # Phase 1: Skill Generation
     console.print(f"[bold]{t('runner.phase1_generating')}[/bold]")
+
+    # Build creator prompt — augment with format instructions for claude format
+    base_prompt = (
+        "Write a task skill based on this description:\n\n"
+        + task.prompt
+        + "\n\nInput files the executor will receive:\n"
+        + input_desc
+    )
+    if skill_format == "claude":
+        base_prompt = (
+            "Write a task skill in Claude Code skill format "
+            "based on this description:\n\n"
+            + task.prompt
+            + "\n\nInput files the executor will receive:\n"
+            + input_desc
+            + "\n\nThe skill MUST:\n"
+            "- Start with YAML frontmatter (--- ... ---) with 'name' and 'description'\n"
+            "- Use numbered phases (## Phase 1 \u2014 Name)\n"
+            "- Include ## Error Handling and ## Rules sections\n"
+            "- Be self-contained (no external file references)\n"
+        )
+
     creator_specs: list[TrialSpec] = []
     for creator in creators:
         creator_specs.append(
             TrialSpec(
                 model=creator,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": (
-                            "Write a task skill based on this description:\n\n"
-                            + task.prompt
-                            + "\n\nInput files the executor will receive:\n"
-                            + input_desc
-                        ),
-                    }
-                ],
+                messages=[{"role": "user", "content": base_prompt}],
                 config=task.config,
                 trial_number=1,
             )
@@ -313,6 +342,9 @@ async def run_mode2(
     )
 
     generated_skills: dict[str, str] = {}
+    lint_scores: dict[str, int] = {}
+    exec_prompts: dict[str, str] = {}  # Cleaned prompts for Phase 2
+
     for i, creator in enumerate(creators):
         if i >= len(skill_results):
             generated_skills[creator.name] = ""
@@ -327,6 +359,17 @@ async def run_mode2(
             generated_skills[creator.name] = result.output_text
             writer.write_generated_skill(creator.name, result.output_text)
 
+            if skill_format == "claude":
+                from skilleval.linter import lint_skill_text, extract_frontmatter
+                from skilleval.skill_parser import _strip_tool_scaffolding
+
+                report = lint_skill_text(result.output_text)
+                lint_scores[creator.name] = report.quality_score
+                _, _, body, _ = extract_frontmatter(result.output_text)
+                exec_prompts[creator.name] = _strip_tool_scaffolding(body)
+            else:
+                exec_prompts[creator.name] = result.output_text
+
     # Phase 2: Execution
     exec_specs: list[TrialSpec] = []
     spec_keys: list[tuple[str, str]] = []
@@ -335,8 +378,8 @@ async def run_mode2(
     if not interrupted:
         console.print(f"[bold]{t('runner.phase2_executing')}[/bold]")
         for creator in creators:
-            skill_text = generated_skills[creator.name]
-            if not skill_text:
+            prompt_text = exec_prompts.get(creator.name, "")
+            if not prompt_text:
                 continue
             for executor in executors:
                 for trial_num in range(1, task.config.trials + 1):
@@ -344,7 +387,7 @@ async def run_mode2(
                         TrialSpec(
                             model=executor,
                             messages=[
-                                {"role": "system", "content": skill_text},
+                                {"role": "system", "content": prompt_text},
                                 {"role": "user", "content": user_content},
                             ],
                             config=task.config,
@@ -403,6 +446,7 @@ async def run_mode2(
                 executor=ex_name,
                 generated_skill=generated_skills[cr_name],
                 result=model_result,
+                lint_score=lint_scores.get(cr_name),
             )
         )
 
@@ -424,6 +468,7 @@ async def run_mode2(
         timestamp=datetime.now().isoformat(),
         matrix_results=matrix_results,
         recommendation=recommendation,
+        skill_format=skill_format if skill_format != "plain" else None,
     )
     await _finalize_run(writer, summary, interrupted)
     return summary
@@ -438,6 +483,7 @@ async def run_mode3(
     creators: list[ModelEntry],
     executors: list[ModelEntry],
     engine: ExecutionEngine,
+    skill_format: str = "plain",
 ) -> RunSummary:
     """Mode 3: Meta-skill x creator x executor chain."""
     if not task.prompt:
@@ -468,6 +514,23 @@ async def run_mode3(
     gen_specs: list[TrialSpec] = []
     gen_keys: list[tuple[str, str]] = []
 
+    # Build user content for creator — augment with format instructions for claude format
+    user_gen_content = (
+        "Write a task skill for this task:\n\n" + task.prompt + "\n\nInput files:\n" + input_desc
+    )
+    if skill_format == "claude":
+        user_gen_content = (
+            "Write a task skill in Claude Code skill format for this task:\n\n"
+            + task.prompt
+            + "\n\nInput files:\n"
+            + input_desc
+            + "\n\nThe skill MUST:\n"
+            "- Start with YAML frontmatter (--- ... ---) with 'name' and 'description'\n"
+            "- Use numbered phases (## Phase 1 \u2014 Name)\n"
+            "- Include ## Error Handling and ## Rules sections\n"
+            "- Be self-contained (no external file references)\n"
+        )
+
     for ms_name in meta_skill_names:
         ms_content = task.meta_skills[ms_name]
         for creator in creators:
@@ -476,15 +539,7 @@ async def run_mode3(
                     model=creator,
                     messages=[
                         {"role": "system", "content": ms_content},
-                        {
-                            "role": "user",
-                            "content": (
-                                "Write a task skill for this task:\n\n"
-                                + task.prompt
-                                + "\n\nInput files:\n"
-                                + input_desc
-                            ),
-                        },
+                        {"role": "user", "content": user_gen_content},
                     ],
                     config=task.config,
                     trial_number=1,
@@ -499,6 +554,9 @@ async def run_mode3(
     )
 
     generated_skills: dict[tuple[str, str], str] = {}
+    lint_scores: dict[tuple[str, str], int] = {}
+    exec_prompts: dict[tuple[str, str], str] = {}
+
     for i, (ms_name, cr_name) in enumerate(gen_keys):
         if i >= len(gen_results):
             generated_skills[(ms_name, cr_name)] = ""
@@ -513,6 +571,17 @@ async def run_mode3(
             generated_skills[(ms_name, cr_name)] = result.output_text
             writer.write_generated_skill(cr_name, result.output_text, meta_skill=ms_name)
 
+            if skill_format == "claude":
+                from skilleval.linter import lint_skill_text, extract_frontmatter
+                from skilleval.skill_parser import _strip_tool_scaffolding
+
+                report = lint_skill_text(result.output_text)
+                lint_scores[(ms_name, cr_name)] = report.quality_score
+                _, _, body, _ = extract_frontmatter(result.output_text)
+                exec_prompts[(ms_name, cr_name)] = _strip_tool_scaffolding(body)
+            else:
+                exec_prompts[(ms_name, cr_name)] = result.output_text
+
     # Phase 2: Execution
     exec_specs: list[TrialSpec] = []
     exec_keys: list[tuple[str, str, str]] = []
@@ -522,8 +591,8 @@ async def run_mode3(
         console.print(f"[bold]{t('runner.phase2_executing')}[/bold]")
         for ms_name in meta_skill_names:
             for creator in creators:
-                skill_text = generated_skills.get((ms_name, creator.name), "")
-                if not skill_text:
+                prompt_text = exec_prompts.get((ms_name, creator.name), "")
+                if not prompt_text:
                     continue
                 for executor in executors:
                     for trial_num in range(1, task.config.trials + 1):
@@ -531,7 +600,7 @@ async def run_mode3(
                             TrialSpec(
                                 model=executor,
                                 messages=[
-                                    {"role": "system", "content": skill_text},
+                                    {"role": "system", "content": prompt_text},
                                     {"role": "user", "content": user_content},
                                 ],
                                 config=task.config,
@@ -592,6 +661,7 @@ async def run_mode3(
                 executor=ex_name,
                 generated_skill=generated_skills.get((ms_name, cr_name), ""),
                 result=model_result,
+                lint_score=lint_scores.get((ms_name, cr_name)),
             )
         )
 
@@ -615,6 +685,7 @@ async def run_mode3(
         timestamp=datetime.now().isoformat(),
         chain_results=chain_results,
         recommendation=recommendation,
+        skill_format=skill_format if skill_format != "plain" else None,
     )
     await _finalize_run(writer, summary, interrupted)
     return summary

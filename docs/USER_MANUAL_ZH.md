@@ -771,9 +771,12 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 **恢复运行：** 传入 `--resume <run_dir>` 可跳过上次运行中已完成的模型。SkillEval 从给定目录读取 `checkpoint.json`，跳过 `completed_models` 中列出的模型。
+
+**技能格式：** 使用 `--skill-format claude` 时，模式 1 会按照 Claude Code 技能规范检查 skill.md，去除工具脚手架，并在结果中报告 `lint_score`（0-100）。
 
 ### `skilleval matrix`
 
@@ -789,6 +792,7 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 ### `skilleval chain`
@@ -807,6 +811,7 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 ### `skilleval catalog`

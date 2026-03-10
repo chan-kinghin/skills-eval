@@ -207,7 +207,7 @@ class TestRunHandler:
 
     def test_run_with_all_params(self, _english_locale):
         mock_ctx = MagicMock()
-        session = _mock_session("./my-task", "qwen-turbo", "5")
+        session = _mock_session("./my-task", "qwen-turbo", "5", "claude")
         with mock.patch("skilleval.tui._invoke_cli") as mock_invoke:
             _handle_run(mock_ctx, session)
             args = mock_invoke.call_args[0][1]
@@ -217,11 +217,13 @@ class TestRunHandler:
             assert "qwen-turbo" in args
             assert "--trials" in args
             assert "5" in args
+            assert "--skill-format" in args
+            assert "claude" in args
 
     def test_run_with_defaults(self, _english_locale):
-        """Pressing Enter for models and trials should omit those flags."""
+        """Pressing Enter for models, trials, and skill_format should omit those flags."""
         mock_ctx = MagicMock()
-        session = _mock_session("./my-task", "", "")
+        session = _mock_session("./my-task", "", "", "")
         with mock.patch("skilleval.tui._invoke_cli") as mock_invoke:
             _handle_run(mock_ctx, session)
             args = mock_invoke.call_args[0][1]
@@ -241,7 +243,7 @@ class TestMatrixHandler:
 
     def test_matrix_with_all_params(self, _english_locale):
         mock_ctx = MagicMock()
-        session = _mock_session("./task", "qwen-max", "glm-5", "3")
+        session = _mock_session("./task", "qwen-max", "glm-5", "3", "")
         with mock.patch("skilleval.tui._invoke_cli") as mock_invoke:
             _handle_matrix(mock_ctx, session)
             args = mock_invoke.call_args[0][1]
@@ -269,7 +271,7 @@ class TestChainHandler:
 
     def test_chain_with_all_params(self, _english_locale):
         mock_ctx = MagicMock()
-        session = _mock_session("./task", "default", "qwen-max", "glm-5", "3")
+        session = _mock_session("./task", "default", "qwen-max", "glm-5", "3", "")
         with mock.patch("skilleval.tui._invoke_cli") as mock_invoke:
             _handle_chain(mock_ctx, session)
             args = mock_invoke.call_args[0][1]

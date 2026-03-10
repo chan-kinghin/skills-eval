@@ -78,7 +78,15 @@ def _write_run_csv(results: list[ModelResult]) -> str:
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(
-        ["model", "pass_rate", "avg_cost", "avg_latency", "total_cost", "context_window"]
+        [
+            "model",
+            "pass_rate",
+            "avg_cost",
+            "avg_latency",
+            "total_cost",
+            "context_window",
+            "lint_score",
+        ]
     )
     for r in sorted(results, key=lambda x: (-x.pass_rate, x.avg_cost)):
         writer.writerow(
@@ -89,6 +97,7 @@ def _write_run_csv(results: list[ModelResult]) -> str:
                 f"{r.avg_latency:.2f}",
                 f"{r.total_cost:.6f}",
                 r.context_window,
+                r.lint_score if r.lint_score is not None else "",
             ]
         )
     return buf.getvalue()
@@ -99,7 +108,15 @@ def _write_matrix_csv(cells: list) -> str:
     buf = io.StringIO(newline="")
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(
-        ["creator", "executor", "pass_rate", "avg_cost", "total_cost", "context_window"]
+        [
+            "creator",
+            "executor",
+            "pass_rate",
+            "avg_cost",
+            "total_cost",
+            "context_window",
+            "lint_score",
+        ]
     )
     for c in cells:
         writer.writerow(
@@ -110,6 +127,7 @@ def _write_matrix_csv(cells: list) -> str:
                 f"{c.result.avg_cost:.6f}",
                 f"{c.result.total_cost:.6f}",
                 c.result.context_window,
+                c.lint_score if c.lint_score is not None else "",
             ]
         )
     return buf.getvalue()
@@ -128,6 +146,7 @@ def _write_chain_csv(cells: list) -> str:
             "avg_cost",
             "total_cost",
             "context_window",
+            "lint_score",
         ]
     )
     for c in cells:
@@ -140,6 +159,7 @@ def _write_chain_csv(cells: list) -> str:
                 f"{c.result.avg_cost:.6f}",
                 f"{c.result.total_cost:.6f}",
                 c.result.context_window,
+                c.lint_score if c.lint_score is not None else "",
             ]
         )
     return buf.getvalue()
@@ -339,6 +359,13 @@ def init(name: str) -> None:
 @click.option(
     "--resume", "resume_dir", default=None, help="Resume a previous run from a checkpoint directory"
 )
+@click.option(
+    "--skill-format",
+    "skill_format",
+    type=click.Choice(["plain", "claude"]),
+    default="plain",
+    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+)
 def run(
     task_path: str,
     models: str | None,
@@ -351,6 +378,7 @@ def run(
     output_fmt: str | None,
     json_output: bool,
     resume_dir: str | None,
+    skill_format: str,
 ) -> None:
     """Mode 1: Evaluate models with a given skill."""
     try:
@@ -411,7 +439,7 @@ def run(
             console.print(f"{t('cli.run.trials_label')} {task.config.trials}")
             display_pre_run_estimate(num_calls, estimated_cost)
 
-        summary = asyncio.run(_run_mode1(task, selected, parallel))
+        summary = asyncio.run(_run_mode1(task, selected, parallel, skill_format))
 
         if fmt == "json":
             click.echo(summary.model_dump_json(indent=2))
@@ -424,12 +452,12 @@ def run(
         raise click.ClickException(str(e))
 
 
-async def _run_mode1(task, selected, parallel):
+async def _run_mode1(task, selected, parallel, skill_format="plain"):
     from skilleval.engine import ExecutionEngine
     from skilleval.runner import run_mode1
 
     async with ExecutionEngine(selected, max_global=parallel) as engine:
-        return await run_mode1(task, selected, engine, parallel)
+        return await run_mode1(task, selected, engine, parallel, skill_format=skill_format)
 
 
 # ── Mode 2: Matrix Evaluation ───────────────────────────────────────────
@@ -453,6 +481,13 @@ async def _run_mode1(task, selected, parallel):
     help="Output format (default: rich)",
 )
 @click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
+@click.option(
+    "--skill-format",
+    "skill_format",
+    type=click.Choice(["plain", "claude"]),
+    default="plain",
+    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+)
 def matrix(
     task_path: str,
     creators: str,
@@ -465,6 +500,7 @@ def matrix(
     model_name: str | None,
     output_fmt: str | None,
     json_output: bool,
+    skill_format: str,
 ) -> None:
     """Mode 2: Creator x executor matrix evaluation."""
     try:
@@ -504,7 +540,9 @@ def matrix(
             )
             display_pre_run_estimate(num_calls, estimated_cost)
 
-        summary = asyncio.run(_run_mode2(task, creator_models, executor_models, parallel))
+        summary = asyncio.run(
+            _run_mode2(task, creator_models, executor_models, parallel, skill_format)
+        )
 
         if fmt == "json":
             click.echo(summary.model_dump_json(indent=2))
@@ -521,13 +559,15 @@ def matrix(
         raise click.ClickException(str(e))
 
 
-async def _run_mode2(task, creator_models, executor_models, parallel):
+async def _run_mode2(task, creator_models, executor_models, parallel, skill_format="plain"):
     from skilleval.engine import ExecutionEngine
     from skilleval.runner import run_mode2
 
     all_models = list({m.name: m for m in creator_models + executor_models}.values())
     async with ExecutionEngine(all_models, max_global=parallel) as engine:
-        return await run_mode2(task, creator_models, executor_models, engine)
+        return await run_mode2(
+            task, creator_models, executor_models, engine, skill_format=skill_format
+        )
 
 
 # ── Mode 3: Chain Evaluation ────────────────────────────────────────────
@@ -553,6 +593,13 @@ async def _run_mode2(task, creator_models, executor_models, parallel):
     help="Output format (default: rich)",
 )
 @click.option("--json", "json_output", is_flag=True, hidden=True, help="Alias for --output json")
+@click.option(
+    "--skill-format",
+    "skill_format",
+    type=click.Choice(["plain", "claude"]),
+    default="plain",
+    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+)
 def chain(
     task_path: str,
     meta_skills: str,
@@ -567,6 +614,7 @@ def chain(
     model_name: str | None,
     output_fmt: str | None,
     json_output: bool,
+    skill_format: str,
 ) -> None:
     """Mode 3: Meta-skill x creator x executor chain evaluation."""
     try:
@@ -627,7 +675,9 @@ def chain(
                 return
 
         summary = asyncio.run(
-            _run_mode3(task, meta_skill_names, creator_models, executor_models, parallel)
+            _run_mode3(
+                task, meta_skill_names, creator_models, executor_models, parallel, skill_format
+            )
         )
 
         if fmt == "json":
@@ -645,13 +695,22 @@ def chain(
         raise click.ClickException(str(e))
 
 
-async def _run_mode3(task, meta_skill_names, creator_models, executor_models, parallel):
+async def _run_mode3(
+    task, meta_skill_names, creator_models, executor_models, parallel, skill_format="plain"
+):
     from skilleval.engine import ExecutionEngine
     from skilleval.runner import run_mode3
 
     all_models = list({m.name: m for m in creator_models + executor_models}.values())
     async with ExecutionEngine(all_models, max_global=parallel) as engine:
-        return await run_mode3(task, meta_skill_names, creator_models, executor_models, engine)
+        return await run_mode3(
+            task,
+            meta_skill_names,
+            creator_models,
+            executor_models,
+            engine,
+            skill_format=skill_format,
+        )
 
 
 # ── Utility Commands ─────────────────────────────────────────────────────
