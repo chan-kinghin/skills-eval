@@ -16,6 +16,8 @@ class Settings:
         )
         self.max_per_provider: int = int(os.environ.get("SKILLEVAL_MAX_PER_PROVIDER", "5"))
         self.max_global: int = int(os.environ.get("SKILLEVAL_MAX_GLOBAL", "20"))
+        self.rate_initial: float = float(os.environ.get("SKILLEVAL_RATE_INITIAL", "5.0"))
+        self.rate_min: float = float(os.environ.get("SKILLEVAL_RATE_MIN", "0.2"))
 
         backoff_env = os.environ.get("SKILLEVAL_BACKOFF_BASE")
         if backoff_env:

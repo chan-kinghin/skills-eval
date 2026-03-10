@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from skilleval.client import ApiError, ModelClient, RateLimitError, TimeoutError, compute_cost
 from skilleval.models import ModelEntry, TaskConfig, TrialResult
+from skilleval.rate_limiter import AdaptiveRateLimiter
 from skilleval.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,10 @@ class ExecutionEngine:
         self._global_semaphore: asyncio.Semaphore | None = None
         self._provider_semaphores: dict[str, asyncio.Semaphore] = {}
         self._failure_counts: dict[str, int] = {}
+        self._rate_limiter = AdaptiveRateLimiter(
+            initial_rate=settings.rate_initial,
+            min_rate=settings.rate_min,
+        )
 
     async def __aenter__(self) -> ExecutionEngine:
         self._exit_stack = contextlib.AsyncExitStack()
@@ -96,21 +101,34 @@ class ExecutionEngine:
         try:
             async with self._global_semaphore:
                 async with provider_sem:
+                    # Re-check circuit breaker inside semaphore — the count may
+                    # have changed while we were waiting for the semaphore or
+                    # the rate limiter token.
+                    if (
+                        self._failure_counts.get(model.provider, 0)
+                        >= self._circuit_breaker_threshold
+                    ):
+                        return TrialResult(
+                            model=model.name,
+                            trial_number=trial_number,
+                            passed=False,
+                            error=f"Circuit breaker open: {model.provider} had {self._circuit_breaker_threshold} consecutive failures",
+                        )
+                    await self._rate_limiter.acquire(model.provider)
                     response = await self._client.chat_completion(model, messages, config)
 
             cost = compute_cost(model, response.input_tokens, response.output_tokens)
 
             # Detect empty responses — some providers silently return empty
-            # content instead of proper 429/error (e.g. Zhipu free tier)
+            # content instead of proper 429/error (e.g. Zhipu free tier).
+            # This is a rate-limit signal, NOT a real failure — don't trip
+            # the circuit breaker.
             if not response.content.strip() and response.output_tokens == 0:
-                self._failure_counts[model.provider] = (
-                    self._failure_counts.get(model.provider, 0) + 1
-                )
+                self._rate_limiter.record_rate_limit(model.provider)
                 logger.warning(
-                    "Empty response detected for %s trial %d (consecutive failures: %d)",
+                    "Empty response detected for %s trial %d (silent rate-limit)",
                     model.name,
                     trial_number,
-                    self._failure_counts[model.provider],
                 )
                 return TrialResult(
                     model=model.name,
@@ -148,8 +166,9 @@ class ExecutionEngine:
                     finish_reason=response.finish_reason,
                 )
 
-            # Success — reset the failure counter for this provider
+            # Success — reset the failure counter and record with rate limiter
             self._failure_counts[model.provider] = 0
+            self._rate_limiter.record_success(model.provider)
 
             return TrialResult(
                 model=model.name,
@@ -163,7 +182,24 @@ class ExecutionEngine:
                 finish_reason=response.finish_reason,
             )
 
-        except (ApiError, RateLimitError, TimeoutError) as e:
+        except RateLimitError as e:
+            # Rate limits are temporary — notify the rate limiter but do NOT
+            # increment _failure_counts (don't trip the circuit breaker).
+            self._rate_limiter.record_rate_limit(model.provider, e.retry_after)
+            logger.warning(
+                "Trial %d rate-limited for %s: %s",
+                trial_number,
+                model.name,
+                e,
+            )
+            return TrialResult(
+                model=model.name,
+                trial_number=trial_number,
+                passed=False,
+                error=str(e),
+            )
+        except (ApiError, TimeoutError) as e:
+            # Real failures — increment the circuit breaker counter.
             self._failure_counts[model.provider] = self._failure_counts.get(model.provider, 0) + 1
             logger.error(
                 "Trial %d failed for %s: %s (consecutive failures: %d)",

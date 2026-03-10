@@ -27,6 +27,10 @@ class ApiError(Exception):
 class RateLimitError(Exception):
     """429 rate-limit error (retryable)."""
 
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        self.retry_after = retry_after
+        super().__init__(message)
+
 
 class TimeoutError(Exception):  # noqa: A001
     """Request timed out."""
@@ -93,22 +97,27 @@ class ModelClient:
                     latency = time.monotonic() - t0
 
                     if resp.status == 429:
-                        last_error = RateLimitError(f"Rate limited by {model.provider}")
+                        retry_after = resp.headers.get("Retry-After")
+                        retry_after_secs: float | None = None
+                        if retry_after:
+                            try:
+                                retry_after_secs = float(retry_after)
+                            except (ValueError, TypeError):
+                                pass
+                        last_error = RateLimitError(
+                            f"Rate limited by {model.provider}",
+                            retry_after=retry_after_secs,
+                        )
                         logger.warning(
                             "Rate limit (429) from %s, attempt %d/%d",
                             model.provider,
                             attempt + 1,
                             self._max_retries,
                         )
-                        retry_after = resp.headers.get("Retry-After")
-                        if retry_after:
-                            try:
-                                wait_secs = float(retry_after)
-                                logger.warning("Retry-After header: %.1fs", wait_secs)
-                                await asyncio.sleep(wait_secs)
-                                continue
-                            except (ValueError, TypeError):
-                                pass
+                        if retry_after_secs is not None:
+                            logger.warning("Retry-After header: %.1fs", retry_after_secs)
+                            await asyncio.sleep(retry_after_secs)
+                            continue
                         await self._backoff(attempt)
                         continue
 
@@ -142,7 +151,8 @@ class ModelClient:
                     # empty responses instead of proper 429. Retry these.
                     if not parsed.content.strip() and parsed.output_tokens == 0:
                         last_error = RateLimitError(
-                            f"Empty response from {model.provider} (silent rate-limit)"
+                            f"Empty response from {model.provider} (silent rate-limit)",
+                            retry_after=None,
                         )
                         logger.warning(
                             "Empty response from %s (silent rate-limit), attempt %d/%d",
