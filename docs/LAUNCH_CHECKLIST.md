@@ -6,14 +6,14 @@ Checklist of platforms, optimizations, and actions for launching SkillEval publi
 
 ## GitHub Repository Optimization
 
-- [ ] **Repository description**: "Find the cheapest LLM that gets your task 100% right. CLI tool for automated model evaluation on deterministic tasks."
-- [ ] **Topics/tags**: `llm`, `llm-evaluation`, `model-selection`, `cost-optimization`, `cli`, `python`, `openai-compatible`, `benchmark`, `nlp`, `automation`
-- [ ] **Social preview image**: Create a 1280x640 image showing the tool name, tagline, and a sample results table. Use a dark background with terminal-style font for the results.
+- [x] **Repository description**: "Find the cheapest LLM that gets your task 100% right. CLI tool for automated model evaluation on deterministic tasks."
+- [x] **Topics/tags**: `llm`, `llm-evaluation`, `model-selection`, `cost-optimization`, `cli`, `python`, `openai-compatible`, `benchmark`, `nlp`, `automation`
+- [x] **Social preview image**: 1280x640 bilingual (EN/ZH) dark theme with custom icon, terminal mockup, and badges.
 - [ ] **Pin the repo** on your GitHub profile
-- [ ] **Add "About" sidebar links**: Link to User Manual and blog post
-- [ ] **Releases**: Create a v0.1.0 release with a changelog summarizing all features
-- [ ] **Issue templates**: Add templates for bug reports and feature requests
-- [ ] **Discussion tab**: Enable Discussions for Q&A and show-and-tell
+- [x] **Add "About" sidebar links**: Homepage set to PyPI page
+- [x] **Releases**: Create a v0.1.0 release with a changelog summarizing all features
+- [x] **Issue templates**: Add templates for bug reports and feature requests
+- [x] **Discussion tab**: Enable Discussions for Q&A and show-and-tell
 
 ---
 
@@ -112,7 +112,7 @@ The default catalog features Chinese cloud providers, so there is natural intere
 
 ## Cross-Promotion Between EN and ZH Communities
 
-- [ ] English README links to Chinese README (`README_ZH.md`) and Chinese User Manual
+- [x] English README links to Chinese README (`README_ZH.md`) and Chinese User Manual
 - [ ] Chinese posts link to the English blog post for bilingual readers
 - [ ] If a post does well on HN or Reddit, mention it in Chinese community posts as social proof
 - [ ] If a post does well on V2EX or Juejin, mention it in English posts to highlight the China-origin provider support
