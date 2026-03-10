@@ -51,7 +51,7 @@ skilleval run my-task/ --json | jq '.recommendation'
 ## 附加功能
 
 - **临时端点** — 无需修改模型目录即可使用任何 OpenAI 兼容 API：`--endpoint`、`--api-key`、`--model-name`。
-- **技能检查（`lint` / `--skill-format claude`）** — 验证 Claude Code 技能结构（frontmatter、阶段、引用、代码块）。在 `run`/`matrix`/`chain` 上使用 `--skill-format claude` 可同时获得 `lint_score`（0-100）。
+- **技能检查（`lint` / `--skill-format`）** — 验证技能结构（frontmatter、阶段、引用、代码块）。使用 `--skill-format claude` 检查 Claude Code 技能，或 `--skill-format openclaw` 检查 OpenClaw SKILL.md 格式。在 `run`/`matrix`/`chain` 上同时获得 `lint_score`（0-100）。
 - **技能测试（`skill-test`）** — 将技能的核心提示逻辑与预期输出进行测试。
 - **运行比较（`compare`）** — 对比两次运行结果以检测改进或退化。
 - **HTML 报告（`report --html`）** — 生成独立的 HTML 报告以便分享。
@@ -59,6 +59,7 @@ skilleval run my-task/ --json | jq '.recommendation'
 - **详细日志（`-v` / `-vv`）** — `-v` 显示 INFO 级别，`-vv` 显示 DEBUG 级别。日志输出到 stderr，不会干扰 `--json` 输出。
 - **自动确认（`--yes` / `-y`）** — 跳过 `chain` 命令的确认提示（替代原来的 `--confirm` 参数）。
 - **配置校验** — 对 `config.yaml` 中的未知键发出警告，并在加载时验证比较器名称。
+- **自适应限流** — 按供应商独立的 AIMD 限流器，遇到 429 响应时自动调整请求速率，防止熔断器误触发。
 - **熔断机制** — 某个供应商连续失败 5 次后自动跳过，避免浪费时间和费用。
 - **Ctrl+C 处理** — 中断时保存已有结果，避免丢失未完成的运行数据。
 - **交互式 TUI** — 不带参数运行 `skilleval` 即可进入引导式交互模式。

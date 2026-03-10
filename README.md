@@ -51,7 +51,7 @@ All providers use OpenAI-compatible chat completion APIs. Set any key above and 
 ## Additional Features
 
 - **Ad-hoc endpoints** — Use any OpenAI-compatible API without editing the catalog: `--endpoint`, `--api-key`, `--model-name`.
-- **Skill linting (`lint` / `--skill-format claude`)** — Validate Claude Code skill structure (frontmatter, phases, references, code blocks). Use `--skill-format claude` on `run`/`matrix`/`chain` to get a `lint_score` (0-100) alongside pass rate.
+- **Skill linting (`lint` / `--skill-format`)** — Validate skill structure (frontmatter, phases, references, code blocks). Use `--skill-format claude` for Claude Code skills or `--skill-format openclaw` for OpenClaw SKILL.md evaluation. Adds a `lint_score` (0-100) alongside pass rate on `run`/`matrix`/`chain`.
 - **Skill testing (`skill-test`)** — Test a skill's core prompt logic against expected outputs.
 - **Run comparison (`compare`)** — Diff two runs to detect improvements or regressions.
 - **HTML reports (`report --html`)** — Generate self-contained HTML reports for sharing.
@@ -59,6 +59,7 @@ All providers use OpenAI-compatible chat completion APIs. Set any key above and 
 - **Verbose logging (`-v` / `-vv`)** — `-v` for INFO, `-vv` for DEBUG. Logs go to stderr so they don't interfere with `--json` output.
 - **Auto-confirm (`--yes` / `-y`)** — Skip the confirmation prompt on `chain` (replaces the old `--confirm` flag).
 - **Config validation** — Warns on unknown keys in `config.yaml` and validates comparator names at load time.
+- **Adaptive rate limiting** — Per-provider AIMD rate limiter automatically adjusts request rates on 429 responses, preventing circuit breaker false trips.
 - **Circuit breaker** — Automatically skips a provider after 5 consecutive failures, avoiding wasted time and cost.
 - **Ctrl+C handling** — Saves partial results on interrupt so you never lose a half-finished run.
 - **Interactive TUI** — Launch `skilleval` with no arguments for a guided interactive mode.

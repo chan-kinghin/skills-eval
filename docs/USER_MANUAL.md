@@ -301,7 +301,7 @@ SkillEval displays a table with columns:
 | Avg Latency | Average response time in seconds |
 | Total Cost | Total cost across all trials |
 | Context Window | Model's maximum context length (tokens) |
-| Lint Score | Skill quality score 0-100 (only with `--skill-format claude`) |
+| Lint Score | Skill quality score 0-100 (only with `--skill-format claude` or `openclaw`) |
 | Rec | Asterisk (`*`) if this is the recommended model |
 
 ### Requirements
@@ -455,20 +455,60 @@ Ad-hoc models default to `$0` for input and output costs. Token usage is still t
 
 **Command:** `skilleval lint <skill_path>`
 
-Validates the structure of a Claude Code skill directory. Useful for catching common issues before testing.
+Validates the structure of a skill directory. Supports three formats via `--skill-format`:
+
+| Format | Description |
+|--------|-------------|
+| `plain` | Default. Only checks frontmatter existence and required fields (`name`, `description`). |
+| `claude` | Full Claude Code skill validation: phases, error handling, rules sections, references, code blocks. |
+| `openclaw` | OpenClaw SKILL.md validation: frontmatter + optional `metadata.openclaw` structure. Free-form body. |
 
 ### What It Checks
+
+**All formats:**
 
 | Check | Severity | Description |
 |-------|----------|-------------|
 | Frontmatter exists | Error | YAML frontmatter (`--- ... ---`) must be present at the top |
 | Required fields | Error | Frontmatter must include `name` and `description` |
-| Numbered phases | Error | At least one `## Phase N` or `### Step N` heading required |
-| Error handling section | Warning | Missing `## Error Handling` heading |
-| Rules section | Warning | Missing `## Rules` or `## Important Rules` heading |
 | Reference file links | Error | Markdown links to `references/` must point to existing files |
 | Python code blocks | Error | Python code blocks must have valid syntax |
 | Bash code blocks | Error | Bash code blocks must pass `bash -n` syntax check |
+
+**Claude format only (`--skill-format claude`):**
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| Numbered phases | Error | At least one `## Phase N` or `### Step N` heading required |
+| Error handling section | Warning | Missing `## Error Handling` heading |
+| Rules section | Warning | Missing `## Rules` or `## Important Rules` heading |
+
+**OpenClaw format only (`--skill-format openclaw`):**
+
+| Check | Severity | Description |
+|-------|----------|-------------|
+| `metadata` type | Warning | `metadata` field in frontmatter must be a mapping if present |
+| `metadata.openclaw` type | Warning | `metadata.openclaw` (or aliases `clawdbot`, `clawdis`) must be a mapping if present |
+| `requires` sub-fields | Warning | `requires.env`, `requires.bins`, `requires.anyBins`, `requires.config` must be lists if present |
+
+### OpenClaw Metadata Example
+
+```yaml
+---
+name: my-openclaw-skill
+description: A skill for OpenClaw
+metadata:
+  openclaw:
+    requires:
+      env:
+        - MY_API_KEY
+      bins:
+        - jq
+        - curl
+      config:
+        - settings.json
+---
+```
 
 ### Quality Score
 
@@ -481,7 +521,11 @@ The linter computes a quality score (0-100):
 ### Example
 
 ```bash
+# Claude Code skill
 skilleval lint ~/.claude/skills/my-skill/
+
+# OpenClaw skill
+skilleval lint ~/.claude/skills/my-skill/ --skill-format openclaw
 ```
 
 ### Exit Code
@@ -785,12 +829,12 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
+| `--skill-format` | No | `plain` | Skill format: `plain`, `claude` (Claude Code lint + strip scaffolding), or `openclaw` (OpenClaw SKILL.md validation) |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 **Resuming a run:** Pass `--resume <run_dir>` to skip models that completed in a previous run. SkillEval reads `checkpoint.json` from the given directory and skips any models listed in `completed_models`.
 
-**Skill format:** With `--skill-format claude`, Mode 1 lints the skill.md against Claude Code skill conventions, strips tool scaffolding, and reports a `lint_score` (0-100) alongside `pass_rate` in results.
+**Skill format:** With `--skill-format claude`, Mode 1 lints the skill.md against Claude Code skill conventions, strips tool scaffolding, and reports a `lint_score` (0-100) alongside `pass_rate` in results. With `--skill-format openclaw`, it validates against OpenClaw conventions (free-form body, optional `metadata.openclaw` structure).
 
 ### `skilleval matrix`
 
@@ -806,7 +850,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
+| `--skill-format` | No | `plain` | Skill format: `plain`, `claude`, or `openclaw` |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval chain`
@@ -825,7 +869,7 @@ Creates a task folder with template files (`config.yaml`, `skill.md`, `prompt.md
 | `--endpoint` | No | — | Ad-hoc OpenAI-compatible endpoint URL |
 | `--api-key` | No | — | API key for ad-hoc endpoint |
 | `--model-name` | No | — | Model name for ad-hoc endpoint |
-| `--skill-format` | No | `plain` | Skill format: `plain` (default) or `claude` (lint + strip scaffolding) |
+| `--skill-format` | No | `plain` | Skill format: `plain`, `claude`, or `openclaw` |
 | `--json` | No | `false` | Output results as JSON (alias for `--output json`) |
 
 ### `skilleval catalog`
@@ -1782,9 +1826,18 @@ ls my-task/meta-skill-*.md
 
 **Cause:** Too many concurrent requests to a provider.
 
-**Fix:** SkillEval has built-in two-level concurrency control (global + per-provider). If you still hit rate limits:
-1. Reduce `--parallel` (e.g., `--parallel 5`).
-2. The engine automatically applies exponential backoff (1s, 2s, 4s) with jitter on 429 responses, retrying up to 3 times.
+**Fix:** SkillEval has multiple layers of protection against rate limits:
+
+1. **Two-level concurrency control** — Global + per-provider semaphores limit parallel requests.
+2. **Adaptive per-provider rate limiter (AIMD)** — Each provider gets an independent rate limiter that automatically adjusts:
+   - Starts at 5 req/s per provider (no throttling by default).
+   - On a 429 response: **halves** the rate (multiplicative decrease), with a floor of 0.2 req/s.
+   - After 3 consecutive successes: **increases** by 0.1 req/s (additive increase), capped at the initial rate.
+   - If the provider sends a `Retry-After` header, the rate is derived from that value.
+   - Use `-v` to see rate limiter activity (e.g., `Rate limiter throttling qwen — waiting 1.50s`).
+3. **Exponential backoff** — On top of rate limiting, individual requests retry with backoff (1s, 2s, 4s) and jitter, up to 3 times.
+
+If you still hit rate limits, reduce `--parallel` (e.g., `--parallel 5`). The adaptive rate limiter also prevents the circuit breaker from false-tripping on legitimate 429s.
 
 ### JSON Comparison Fails Despite Correct Values
 

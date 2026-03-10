@@ -301,7 +301,7 @@ SkillEval 显示的表格包含以下列：
 | Avg Latency | 平均响应时间（秒） |
 | Total Cost | 所有试验的总费用 |
 | Context Window | 模型的最大上下文长度（token 数） |
-| Lint Score | 技能质量评分 0-100（仅在 `--skill-format claude` 时显示） |
+| Lint Score | 技能质量评分 0-100（仅在 `--skill-format claude` 或 `openclaw` 时显示） |
 | Rec | 星号（`*`）表示推荐模型 |
 
 ### 要求
@@ -455,20 +455,60 @@ skilleval run my-task \
 
 **命令：** `skilleval lint <skill_path>`
 
-验证 Claude Code 技能目录的结构。在测试前用于发现常见问题。
+验证技能目录的结构。通过 `--skill-format` 支持三种格式：
+
+| 格式 | 说明 |
+|------|------|
+| `plain` | 默认。仅检查 frontmatter 存在和必需字段（`name`、`description`）。 |
+| `claude` | 完整的 Claude Code 技能验证：阶段、错误处理、规则部分、引用、代码块。 |
+| `openclaw` | OpenClaw SKILL.md 验证：frontmatter + 可选的 `metadata.openclaw` 结构。正文格式自由。 |
 
 ### 检查项目
+
+**所有格式：**
 
 | 检查项 | 严重性 | 说明 |
 |--------|--------|------|
 | Frontmatter 存在 | 错误 | 文件顶部必须有 YAML frontmatter（`--- ... ---`） |
 | 必需字段 | 错误 | Frontmatter 必须包含 `name` 和 `description` |
-| 编号阶段 | 错误 | 至少需要一个 `## Phase N` 或 `### Step N` 标题 |
-| 错误处理部分 | 警告 | 缺少 `## Error Handling` 标题 |
-| 规则部分 | 警告 | 缺少 `## Rules` 或 `## Important Rules` 标题 |
 | 引用文件链接 | 错误 | 指向 `references/` 的 Markdown 链接必须指向存在的文件 |
 | Python 代码块 | 错误 | Python 代码块必须有有效语法 |
 | Bash 代码块 | 错误 | Bash 代码块必须通过 `bash -n` 语法检查 |
+
+**仅限 Claude 格式（`--skill-format claude`）：**
+
+| 检查项 | 严重性 | 说明 |
+|--------|--------|------|
+| 编号阶段 | 错误 | 至少需要一个 `## Phase N` 或 `### Step N` 标题 |
+| 错误处理部分 | 警告 | 缺少 `## Error Handling` 标题 |
+| 规则部分 | 警告 | 缺少 `## Rules` 或 `## Important Rules` 标题 |
+
+**仅限 OpenClaw 格式（`--skill-format openclaw`）：**
+
+| 检查项 | 严重性 | 说明 |
+|--------|--------|------|
+| `metadata` 类型 | 警告 | frontmatter 中的 `metadata` 字段必须为映射（如存在） |
+| `metadata.openclaw` 类型 | 警告 | `metadata.openclaw`（或别名 `clawdbot`、`clawdis`）必须为映射（如存在） |
+| `requires` 子字段 | 警告 | `requires.env`、`requires.bins`、`requires.anyBins`、`requires.config` 必须为列表（如存在） |
+
+### OpenClaw 元数据示例
+
+```yaml
+---
+name: my-openclaw-skill
+description: 一个 OpenClaw 技能
+metadata:
+  openclaw:
+    requires:
+      env:
+        - MY_API_KEY
+      bins:
+        - jq
+        - curl
+      config:
+        - settings.json
+---
+```
 
 ### 质量分数
 
@@ -481,7 +521,11 @@ skilleval run my-task \
 ### 示例
 
 ```bash
+# Claude Code 技能
 skilleval lint ~/.claude/skills/my-skill/
+
+# OpenClaw 技能
+skilleval lint ~/.claude/skills/my-skill/ --skill-format openclaw
 ```
 
 ### 退出码
@@ -763,12 +807,12 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
-| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`、`claude`（检查 + 去除脚手架）或 `openclaw`（OpenClaw SKILL.md 验证） |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 **恢复运行：** 传入 `--resume <run_dir>` 可跳过上次运行中已完成的模型。SkillEval 从给定目录读取 `checkpoint.json`，跳过 `completed_models` 中列出的模型。
 
-**技能格式：** 使用 `--skill-format claude` 时，模式 1 会按照 Claude Code 技能规范检查 skill.md，去除工具脚手架，并在结果中报告 `lint_score`（0-100）。
+**技能格式：** 使用 `--skill-format claude` 时，模式 1 会按照 Claude Code 技能规范检查 skill.md，去除工具脚手架，并在结果中报告 `lint_score`（0-100）。使用 `--skill-format openclaw` 时，按照 OpenClaw 规范验证（自由正文格式，可选 `metadata.openclaw` 结构）。
 
 ### `skilleval matrix`
 
@@ -784,7 +828,7 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
-| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`、`claude` 或 `openclaw` |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 ### `skilleval chain`
@@ -803,7 +847,7 @@ echo "language: zh" > ~/.config/skilleval/settings.yaml
 | `--endpoint` | 否 | — | 临时 OpenAI 兼容端点 URL |
 | `--api-key` | 否 | — | 临时端点的 API 密钥 |
 | `--model-name` | 否 | — | 临时端点的模型名称 |
-| `--skill-format` | 否 | `plain` | 技能格式：`plain`（默认）或 `claude`（检查 + 去除脚手架） |
+| `--skill-format` | 否 | `plain` | 技能格式：`plain`、`claude` 或 `openclaw` |
 | `--json` | 否 | `false` | 以 JSON 格式输出结果（`--output json` 的别名） |
 
 ### `skilleval catalog`
@@ -1761,9 +1805,18 @@ ls my-task/meta-skill-*.md
 
 **原因：** 对供应商的并发请求过多。
 
-**解决方法：** SkillEval 内置了两级并发控制（全局 + 按供应商）。如果仍然遇到限流：
-1. 减少 `--parallel`（例如 `--parallel 5`）。
-2. 引擎在收到 429 响应时会自动应用指数退避（1秒、2秒、4秒）加随机抖动，最多重试 3 次。
+**解决方法：** SkillEval 内置多层限流保护：
+
+1. **两级并发控制** — 全局 + 按供应商信号量限制并行请求数。
+2. **自适应按供应商限流器（AIMD）** — 每个供应商有独立的限流器，自动调整：
+   - 初始速率 5 req/s（默认不节流）。
+   - 收到 429 响应时：速率**减半**（乘法递减），最低 0.2 req/s。
+   - 连续 3 次成功后：速率**增加** 0.1 req/s（加法递增），上限为初始速率。
+   - 如果供应商返回 `Retry-After` 头，速率会根据该值自动调整。
+   - 使用 `-v` 可查看限流器活动日志（如 `Rate limiter throttling qwen — waiting 1.50s`）。
+3. **指数退避** — 在限流之上，单个请求还会以退避重试（1秒、2秒、4秒）加随机抖动，最多 3 次。
+
+如果仍然遇到限流，减少 `--parallel`（例如 `--parallel 5`）。自适应限流器还能防止熔断器因正常的 429 响应而误触发。
 
 ### JSON 比较失败，但值看起来正确
 
