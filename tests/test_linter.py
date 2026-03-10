@@ -293,3 +293,171 @@ a = (
         iss.severity == "error" and iss.message.startswith("Invalid Python code block")
         for iss in report.issues
     )
+
+
+# ── OpenClaw format lint tests ────────────────────────────────────────
+
+
+def test_openclaw_valid_no_phases_required(tmp_path: Path) -> None:
+    """OpenClaw skills don't need numbered phases or error handling/rules sections."""
+    skill_md = """---
+name: todoist-cli
+description: Manage Todoist tasks from the CLI.
+---
+
+# Todoist CLI Skill
+
+When the user asks to manage tasks, use the Todoist API.
+
+## Setup
+
+Configure the API key.
+
+## Usage
+
+Create, update, and delete tasks.
+"""
+    write(tmp_path / "SKILL.md", skill_md)
+    report = lint_skill(tmp_path, skill_format="openclaw")
+    errors = [i for i in report.issues if i.severity == "error"]
+    assert not errors
+    assert report.quality_score == 100
+
+
+def test_openclaw_valid_with_metadata(tmp_path: Path) -> None:
+    """OpenClaw skill with full metadata.openclaw block passes cleanly."""
+    skill_md = """---
+name: todoist-cli
+description: Manage Todoist tasks.
+version: 1.2.0
+metadata:
+  openclaw:
+    requires:
+      env:
+        - TODOIST_API_KEY
+      bins:
+        - curl
+    primaryEnv: TODOIST_API_KEY
+    emoji: "✅"
+---
+
+# Todoist CLI
+
+Manage tasks via API.
+"""
+    write(tmp_path / "SKILL.md", skill_md)
+    report = lint_skill(tmp_path, skill_format="openclaw")
+    assert report.issues == []
+    assert report.quality_score == 100
+
+
+def test_openclaw_invalid_requires_env_type() -> None:
+    """metadata.openclaw.requires.env must be a list."""
+    text = """---
+name: a
+description: b
+metadata:
+  openclaw:
+    requires:
+      env: NOT_A_LIST
+---
+
+# Skill
+
+Content.
+"""
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert any(
+        "requires.env must be a list" in i.message for i in report.issues if i.severity == "warning"
+    )
+
+
+def test_openclaw_invalid_requires_bins_type() -> None:
+    """metadata.openclaw.requires.bins must be a list."""
+    text = """---
+name: a
+description: b
+metadata:
+  openclaw:
+    requires:
+      bins: just-a-string
+---
+
+# Skill
+
+Content.
+"""
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert any(
+        "requires.bins must be a list" in i.message
+        for i in report.issues
+        if i.severity == "warning"
+    )
+
+
+def test_openclaw_missing_frontmatter() -> None:
+    """OpenClaw skills still require frontmatter."""
+    text = "# No frontmatter\n\nJust content.\n"
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert any(
+        iss.severity == "error" and "Missing YAML frontmatter" in iss.message
+        for iss in report.issues
+    )
+
+
+def test_openclaw_missing_name() -> None:
+    """OpenClaw skills still require name in frontmatter."""
+    text = """---
+description: only description
+---
+
+# Skill
+
+Content.
+"""
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert any(
+        iss.severity == "error" and "missing required field: name" in iss.message
+        for iss in report.issues
+    )
+
+
+def test_openclaw_catches_bad_code_blocks() -> None:
+    """Code block validation still applies for openclaw format."""
+    text = """---
+name: a
+description: b
+---
+
+# Skill
+
+```python
+a = (
+```
+"""
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert any(
+        iss.severity == "error" and "Invalid Python code block" in iss.message
+        for iss in report.issues
+    )
+
+
+def test_openclaw_accepts_clawdbot_alias() -> None:
+    """metadata.clawdbot is accepted as alias for metadata.openclaw."""
+    text = """---
+name: a
+description: b
+metadata:
+  clawdbot:
+    requires:
+      env:
+        - MY_KEY
+---
+
+# Skill
+
+Content.
+"""
+    report = lint_skill_text(text, skill_format="openclaw")
+    assert report.issues == []
+    assert report.quality_score == 100

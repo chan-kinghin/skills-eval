@@ -87,7 +87,7 @@
 # Frontier — MiniMax's latest, strong document understanding
 - name: MiniMax-M2.5
   provider: minimax
-  endpoint: https://api.minimax.io/v1
+  endpoint: https://api.minimaxi.com/v1
   input_cost_per_m: 0.30
   output_cost_per_m: 1.20
   env_key: MINIMAX_API_KEY
@@ -96,7 +96,7 @@
 # Mid — Solid previous-gen model, good cost/quality tradeoff
 - name: MiniMax-M2
   provider: minimax
-  endpoint: https://api.minimax.io/v1
+  endpoint: https://api.minimaxi.com/v1
   input_cost_per_m: 0.26
   output_cost_per_m: 1.00
   env_key: MINIMAX_API_KEY
@@ -105,7 +105,7 @@
 # Budget — Older model, cheapest MiniMax option
 - name: MiniMax-Text-01
   provider: minimax
-  endpoint: https://api.minimax.io/v1
+  endpoint: https://api.minimaxi.com/v1
   input_cost_per_m: 0.20
   output_cost_per_m: 1.10
   env_key: MINIMAX_API_KEY

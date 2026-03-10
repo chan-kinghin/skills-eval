@@ -181,14 +181,14 @@ async def run_mode1(
     user_content = format_input_files(task.input_files)
     comparator_kwargs = _build_comparator_kwargs(task)
 
-    # Claude format: lint the skill and use the stripped core prompt
+    # Claude/OpenClaw format: lint the skill and use the stripped core prompt
     lint_score: int | None = None
     system_prompt = task.skill
-    if skill_format == "claude":
+    if skill_format in ("claude", "openclaw"):
         from skilleval.linter import lint_skill
         from skilleval.skill_parser import parse_skill
 
-        report = lint_skill(task.path)
+        report = lint_skill(task.path, skill_format=skill_format)
         lint_score = report.quality_score
         skill_prompt = parse_skill(task.path)
         system_prompt = skill_prompt.core_prompt
@@ -303,7 +303,7 @@ async def run_mode2(
     # Phase 1: Skill Generation
     console.print(f"[bold]{t('runner.phase1_generating')}[/bold]")
 
-    # Build creator prompt — augment with format instructions for claude format
+    # Build creator prompt — augment with format instructions for claude/openclaw format
     base_prompt = (
         "Write a task skill based on this description:\n\n"
         + task.prompt
@@ -322,6 +322,19 @@ async def run_mode2(
             "- Use numbered phases (## Phase 1 \u2014 Name)\n"
             "- Include ## Error Handling and ## Rules sections\n"
             "- Be self-contained (no external file references)\n"
+        )
+    elif skill_format == "openclaw":
+        base_prompt = (
+            "Write a task skill in OpenClaw SKILL.md format "
+            "based on this description:\n\n"
+            + task.prompt
+            + "\n\nInput files the executor will receive:\n"
+            + input_desc
+            + "\n\nThe skill MUST:\n"
+            "- Start with YAML frontmatter (--- ... ---) with 'name' and 'description'\n"
+            "- Use clear markdown headings to organize instructions\n"
+            "- Be self-contained (no external file references)\n"
+            "- Optionally include metadata.openclaw with requires.env if API keys are needed\n"
         )
 
     creator_specs: list[TrialSpec] = []
@@ -359,11 +372,11 @@ async def run_mode2(
             generated_skills[creator.name] = result.output_text
             writer.write_generated_skill(creator.name, result.output_text)
 
-            if skill_format == "claude":
-                from skilleval.linter import lint_skill_text, extract_frontmatter
+            if skill_format in ("claude", "openclaw"):
+                from skilleval.linter import extract_frontmatter, lint_skill_text
                 from skilleval.skill_parser import _strip_tool_scaffolding
 
-                report = lint_skill_text(result.output_text)
+                report = lint_skill_text(result.output_text, skill_format=skill_format)
                 lint_scores[creator.name] = report.quality_score
                 _, _, body, _ = extract_frontmatter(result.output_text)
                 exec_prompts[creator.name] = _strip_tool_scaffolding(body)
@@ -514,7 +527,7 @@ async def run_mode3(
     gen_specs: list[TrialSpec] = []
     gen_keys: list[tuple[str, str]] = []
 
-    # Build user content for creator — augment with format instructions for claude format
+    # Build user content for creator — augment with format instructions for claude/openclaw format
     user_gen_content = (
         "Write a task skill for this task:\n\n" + task.prompt + "\n\nInput files:\n" + input_desc
     )
@@ -529,6 +542,18 @@ async def run_mode3(
             "- Use numbered phases (## Phase 1 \u2014 Name)\n"
             "- Include ## Error Handling and ## Rules sections\n"
             "- Be self-contained (no external file references)\n"
+        )
+    elif skill_format == "openclaw":
+        user_gen_content = (
+            "Write a task skill in OpenClaw SKILL.md format for this task:\n\n"
+            + task.prompt
+            + "\n\nInput files:\n"
+            + input_desc
+            + "\n\nThe skill MUST:\n"
+            "- Start with YAML frontmatter (--- ... ---) with 'name' and 'description'\n"
+            "- Use clear markdown headings to organize instructions\n"
+            "- Be self-contained (no external file references)\n"
+            "- Optionally include metadata.openclaw with requires.env if API keys are needed\n"
         )
 
     for ms_name in meta_skill_names:
@@ -571,11 +596,11 @@ async def run_mode3(
             generated_skills[(ms_name, cr_name)] = result.output_text
             writer.write_generated_skill(cr_name, result.output_text, meta_skill=ms_name)
 
-            if skill_format == "claude":
-                from skilleval.linter import lint_skill_text, extract_frontmatter
+            if skill_format in ("claude", "openclaw"):
+                from skilleval.linter import extract_frontmatter, lint_skill_text
                 from skilleval.skill_parser import _strip_tool_scaffolding
 
-                report = lint_skill_text(result.output_text)
+                report = lint_skill_text(result.output_text, skill_format=skill_format)
                 lint_scores[(ms_name, cr_name)] = report.quality_score
                 _, _, body, _ = extract_frontmatter(result.output_text)
                 exec_prompts[(ms_name, cr_name)] = _strip_tool_scaffolding(body)

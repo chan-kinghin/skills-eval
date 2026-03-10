@@ -172,7 +172,7 @@ tui:
     old_run: "Old run path"
     new_run: "New run path"
     task_name: "Task name"
-    skill_format: "Skill format (plain/claude)"
+    skill_format: "Skill format (plain/claude/openclaw)"
 
   language:
     current: "Current language: {lang}"

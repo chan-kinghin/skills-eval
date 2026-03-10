@@ -172,7 +172,7 @@ tui:
     old_run: "旧运行路径"
     new_run: "新运行路径"
     task_name: "任务名称"
-    skill_format: "技能格式（plain/claude）"
+    skill_format: "技能格式（plain/claude/openclaw）"
 
   language:
     current: "当前语言：{lang}"

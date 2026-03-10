@@ -43,15 +43,16 @@ class LintReport:
 # -----------------------------
 
 
-def lint_skill(skill_dir: Path) -> LintReport:
+def lint_skill(skill_dir: Path, *, skill_format: str = "claude") -> LintReport:
     """Lint a skill directory containing `skill.md` or `SKILL.md`.
 
     Validates:
     - YAML frontmatter has required fields
-    - Phase/step structure with numbered headings
+    - Phase/step structure with numbered headings (claude format only)
     - Reference files under `references/` exist if linked
-    - Presence of error-handling and rules sections
+    - Presence of error-handling and rules sections (claude format only)
     - Syntax of code blocks (python via compile, bash via `bash -n`)
+    - OpenClaw metadata structure (openclaw format only)
     """
 
     issues: list[LintIssue] = []
@@ -70,21 +71,23 @@ def lint_skill(skill_dir: Path) -> LintReport:
         return _finalize_report(issues, skill_file)
 
     # Delegate to shared logic, with skill_dir for reference checking
-    report = _lint_content(text, skill_dir=skill_dir)
+    report = _lint_content(text, skill_dir=skill_dir, skill_format=skill_format)
     report.skill_path = skill_file
     return report
 
 
-def lint_skill_text(text: str) -> LintReport:
+def lint_skill_text(text: str, *, skill_format: str = "claude") -> LintReport:
     """Lint skill text directly (no filesystem needed).
 
     Same checks as ``lint_skill`` except reference-link validation is skipped
     because there is no directory to resolve paths against.
     """
-    return _lint_content(text, skill_dir=None)
+    return _lint_content(text, skill_dir=None, skill_format=skill_format)
 
 
-def _lint_content(text: str, skill_dir: Path | None = None) -> LintReport:
+def _lint_content(
+    text: str, skill_dir: Path | None = None, skill_format: str = "claude"
+) -> LintReport:
     """Shared lint logic used by both ``lint_skill`` and ``lint_skill_text``."""
 
     issues: list[LintIssue] = []
@@ -109,12 +112,16 @@ def _lint_content(text: str, skill_dir: Path | None = None) -> LintReport:
                     LintIssue("error", "Frontmatter missing required field: description", line=1)
                 )
 
+            # OpenClaw-specific: validate metadata.openclaw structure
+            if skill_format == "openclaw":
+                _validate_openclaw_metadata(fm, issues)
+
     # 2) Parse body for headings and code blocks (ignoring code fence contents for headings)
     headings = collect_headings(body, base_line=body_start_line)
     code_blocks = _collect_code_blocks(body, base_line=body_start_line)
 
-    # 3) Phase/step structure
-    if not _has_numbered_phases(headings):
+    # 3) Phase/step structure (claude format only — openclaw is free-form)
+    if skill_format != "openclaw" and not _has_numbered_phases(headings):
         issues.append(
             LintIssue(
                 "error",
@@ -122,15 +129,16 @@ def _lint_content(text: str, skill_dir: Path | None = None) -> LintReport:
             )
         )
 
-    # 4) Required sections: Error Handling and Rules
-    if not _has_error_handling_section(headings):
-        issues.append(
-            LintIssue("warning", "Missing an Error Handling section (## Error Handling).")
-        )
-    if not _has_rules_section(headings):
-        issues.append(
-            LintIssue("warning", "Missing a Rules section (## Rules or ## Important Rules).")
-        )
+    # 4) Required sections: Error Handling and Rules (claude format only)
+    if skill_format != "openclaw":
+        if not _has_error_handling_section(headings):
+            issues.append(
+                LintIssue("warning", "Missing an Error Handling section (## Error Handling).")
+            )
+        if not _has_rules_section(headings):
+            issues.append(
+                LintIssue("warning", "Missing a Rules section (## Rules or ## Important Rules).")
+            )
 
     # 5) Reference links — only when a directory is available
     if skill_dir is not None:
@@ -162,6 +170,49 @@ def _lint_content(text: str, skill_dir: Path | None = None) -> LintReport:
 
     # 7) Compute quality score
     return _finalize_report(issues, None)
+
+
+# -----------------------------
+# OpenClaw metadata validation
+# -----------------------------
+
+
+def _validate_openclaw_metadata(fm: dict, issues: list[LintIssue]) -> None:
+    """Validate OpenClaw-specific metadata in frontmatter."""
+    meta = fm.get("metadata")
+    if meta is None:
+        return  # metadata.openclaw is optional
+
+    if not isinstance(meta, dict):
+        issues.append(LintIssue("warning", "Frontmatter 'metadata' must be a mapping.", line=1))
+        return
+
+    # Accept openclaw, clawdbot, or clawdis aliases
+    oc = meta.get("openclaw") or meta.get("clawdbot") or meta.get("clawdis")
+    if oc is None:
+        return  # No openclaw block — that's fine
+
+    if not isinstance(oc, dict):
+        issues.append(LintIssue("warning", "metadata.openclaw must be a mapping.", line=1))
+        return
+
+    requires = oc.get("requires")
+    if requires is not None:
+        if not isinstance(requires, dict):
+            issues.append(
+                LintIssue("warning", "metadata.openclaw.requires must be a mapping.", line=1)
+            )
+        else:
+            for key in ("env", "bins", "anyBins", "config"):
+                val = requires.get(key)
+                if val is not None and not isinstance(val, list):
+                    issues.append(
+                        LintIssue(
+                            "warning",
+                            f"metadata.openclaw.requires.{key} must be a list.",
+                            line=1,
+                        )
+                    )
 
 
 # -----------------------------

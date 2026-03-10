@@ -362,9 +362,9 @@ def init(name: str) -> None:
 @click.option(
     "--skill-format",
     "skill_format",
-    type=click.Choice(["plain", "claude"]),
+    type=click.Choice(["plain", "claude", "openclaw"]),
     default="plain",
-    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+    help="Skill format: 'plain', 'claude', or 'openclaw' (lint + strip scaffolding)",
 )
 def run(
     task_path: str,
@@ -484,9 +484,9 @@ async def _run_mode1(task, selected, parallel, skill_format="plain"):
 @click.option(
     "--skill-format",
     "skill_format",
-    type=click.Choice(["plain", "claude"]),
+    type=click.Choice(["plain", "claude", "openclaw"]),
     default="plain",
-    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+    help="Skill format: 'plain', 'claude', or 'openclaw' (lint + strip scaffolding)",
 )
 def matrix(
     task_path: str,
@@ -596,9 +596,9 @@ async def _run_mode2(task, creator_models, executor_models, parallel, skill_form
 @click.option(
     "--skill-format",
     "skill_format",
-    type=click.Choice(["plain", "claude"]),
+    type=click.Choice(["plain", "claude", "openclaw"]),
     default="plain",
-    help="Skill format: 'plain' (default) or 'claude' (lint + strip scaffolding)",
+    help="Skill format: 'plain', 'claude', or 'openclaw' (lint + strip scaffolding)",
 )
 def chain(
     task_path: str,
