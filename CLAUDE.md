@@ -46,7 +46,7 @@ Key modules:
 
 - **System Python is 3.9** — always use `.venv/bin/python` for running/testing
 - **Version is git-tag-derived** (hatch-vcs) — no hardcoded version; `_version.py` is auto-generated and gitignored
-- **API keys**: `DASHSCOPE_API_KEY` (Qwen, Beijing endpoint), `ZHIPU_API_KEY` (GLM), `MINIMAX_API_KEY`
+- **API keys**: `DASHSCOPE_API_KEY` (Qwen, Beijing endpoint), `ZHIPU_API_KEY` (GLM), `MINIMAX_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`
 - **All 197+ tests run offline** — no API keys needed for testing
 - **Format before committing** — CI enforces `ruff format`; run `ruff format src/ tests/` before commits
 

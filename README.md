@@ -32,11 +32,15 @@ skilleval run my-task/ --json | jq '.recommendation'
 
 ## Supported Providers
 
-| Provider   | Platform                  | Env Variable         |
-|------------|---------------------------|----------------------|
-| **Qwen**   | Alibaba Cloud / DashScope | `DASHSCOPE_API_KEY`  |
-| **GLM**    | Zhipu AI / BigModel       | `ZHIPU_API_KEY`      |
-| **MiniMax** | MiniMax                  | `MINIMAX_API_KEY`    |
+| Provider    | Platform                  | Env Variable         |
+|-------------|---------------------------|----------------------|
+| **Qwen**    | Alibaba Cloud / DashScope | `DASHSCOPE_API_KEY`  |
+| **GLM**     | Zhipu AI / BigModel       | `ZHIPU_API_KEY`      |
+| **MiniMax** | MiniMax                   | `MINIMAX_API_KEY`    |
+| **OpenAI**  | OpenAI                    | `OPENAI_API_KEY`     |
+| **DeepSeek**| DeepSeek                  | `DEEPSEEK_API_KEY`   |
+
+All providers use OpenAI-compatible chat completion APIs. Set any key above and the corresponding models appear in `skilleval catalog`.
 
 ## Evaluation Modes
 

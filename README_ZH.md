@@ -32,11 +32,15 @@ skilleval run my-task/ --json | jq '.recommendation'
 
 ## 支持的供应商
 
-| 供应商      | 平台                       | 环境变量               |
-|------------|---------------------------|----------------------|
-| **通义千问** | 阿里云 / DashScope         | `DASHSCOPE_API_KEY`  |
-| **智谱 GLM** | 智谱 AI / BigModel        | `ZHIPU_API_KEY`      |
-| **MiniMax** | MiniMax                   | `MINIMAX_API_KEY`    |
+| 供应商        | 平台                       | 环境变量               |
+|--------------|---------------------------|----------------------|
+| **通义千问**  | 阿里云 / DashScope         | `DASHSCOPE_API_KEY`  |
+| **智谱 GLM** | 智谱 AI / BigModel         | `ZHIPU_API_KEY`      |
+| **MiniMax**  | MiniMax                    | `MINIMAX_API_KEY`    |
+| **OpenAI**   | OpenAI                     | `OPENAI_API_KEY`     |
+| **DeepSeek** | 深度求索                    | `DEEPSEEK_API_KEY`   |
+
+所有供应商使用 OpenAI 兼容的 Chat Completion API。设置上述任一密钥后，对应模型将自动出现在 `skilleval catalog` 中。
 
 ## 评估模式
 
