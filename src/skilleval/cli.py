@@ -944,3 +944,58 @@ async def _run_skill_test(cases, selected, parallel):
         return await asyncio.gather(
             *(run_mode1(case, selected, engine, parallel) for case in cases)
         )
+
+
+@cli.command()
+@click.argument("test_cases_path")
+@click.option("--md", "md_path", default=None, help="Save Markdown report to path")
+@click.option("--html", "html_path", default=None, help="Save HTML report to path")
+@click.option("--open", "open_browser", is_flag=True, help="Open HTML in browser")
+@click.option("--json", "json_output", is_flag=True, help="Output analysis as JSON")
+def analyze(
+    test_cases_path: str,
+    md_path: str | None,
+    html_path: str | None,
+    open_browser: bool,
+    json_output: bool,
+) -> None:
+    """Analyze skill-test results with failure insights (bilingual).
+
+    Reads trial outputs across models, categorizes failures, and generates
+    a bilingual (中文/English) report with fix suggestions.
+    """
+    try:
+        from skilleval.analyze import (
+            analyze_skill_test,
+            generate_html_analysis,
+            generate_markdown_report,
+        )
+
+        report = analyze_skill_test(Path(test_cases_path))
+
+        if json_output:
+            import dataclasses
+
+            click.echo(json.dumps(dataclasses.asdict(report), indent=2, default=str))
+            return
+
+        if md_path:
+            md_text = generate_markdown_report(report)
+            Path(md_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(md_path).write_text(md_text, encoding="utf-8")
+            click.echo(f"Markdown report written to: {md_path}")
+
+        if html_path:
+            html_text = generate_html_analysis(report)
+            Path(html_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(html_path).write_text(html_text, encoding="utf-8")
+            click.echo(f"HTML report written to: {html_path}")
+            if open_browser:
+                webbrowser.open(Path(html_path).resolve().as_uri())
+
+        if not md_path and not html_path and not json_output:
+            # Default: print markdown to stdout
+            click.echo(generate_markdown_report(report))
+
+    except (ValueError, FileNotFoundError) as e:
+        raise click.ClickException(str(e))

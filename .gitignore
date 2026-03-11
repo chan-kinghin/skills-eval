@@ -29,3 +29,10 @@ htmlcov/
 # IDE
 .vscode/
 .idea/
+
+# Local task folders
+my-first-task/
+
+# Stray images
+ChatGPT Image*
+social-preview copy*
