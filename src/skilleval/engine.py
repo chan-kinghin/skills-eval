@@ -71,6 +71,7 @@ class ExecutionEngine:
         messages: list[dict],
         config: TaskConfig,
         trial_number: int,
+        _rate_limit_attempt: int = 0,
     ) -> TrialResult:
         """Execute a single trial with concurrency control."""
         if self._client is None or self._global_semaphore is None:
@@ -186,11 +187,30 @@ class ExecutionEngine:
             # Rate limits are temporary — notify the rate limiter but do NOT
             # increment _failure_counts (don't trip the circuit breaker).
             self._rate_limiter.record_rate_limit(model.provider, e.retry_after)
+            max_rl_retries = get_settings().engine_rate_limit_retries
+            if _rate_limit_attempt < max_rl_retries:
+                wait = e.retry_after or (5.0 * (2**_rate_limit_attempt))
+                logger.warning(
+                    "Trial %d rate-limited for %s (attempt %d/%d), retrying in %.1fs",
+                    trial_number,
+                    model.name,
+                    _rate_limit_attempt + 1,
+                    max_rl_retries,
+                    wait,
+                )
+                await asyncio.sleep(wait)
+                return await self.execute_trial(
+                    model,
+                    messages,
+                    config,
+                    trial_number,
+                    _rate_limit_attempt=_rate_limit_attempt + 1,
+                )
             logger.warning(
-                "Trial %d rate-limited for %s: %s",
+                "Trial %d rate-limited for %s: exhausted %d engine retries",
                 trial_number,
                 model.name,
-                e,
+                max_rl_retries,
             )
             return TrialResult(
                 model=model.name,

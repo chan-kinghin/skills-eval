@@ -1,0 +1,1 @@
+re:(?i)(empty\s*file|frontmatter|broken.*link|空文件|缺少.*frontmatter)

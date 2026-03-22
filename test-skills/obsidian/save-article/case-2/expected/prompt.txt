@@ -1,0 +1,1 @@
+re:(?i)(frontmatter|title.*date.*type|YAML.*front)

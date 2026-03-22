@@ -1,0 +1,1 @@
+re:(?i)(assignee|负责人|group.*by.*person|按.*人.*分)

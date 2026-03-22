@@ -1,0 +1,1 @@
+Generate a commercial invoice and packing list based on the following booking data: Consignee is ABC Trading Co., port of loading is Ningbo, destination port is Los Angeles. Include the standard CI/PL structure with item descriptions, quantities, weights, and carton dimensions.

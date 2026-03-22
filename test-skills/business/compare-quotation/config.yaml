@@ -1,0 +1,6 @@
+comparator: text_contains
+trials: 1
+temperature: 0.0
+max_tokens: 4096
+timeout: 180
+output_format: text

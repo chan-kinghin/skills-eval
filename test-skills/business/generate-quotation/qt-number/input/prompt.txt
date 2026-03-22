@@ -1,0 +1,1 @@
+Generate a quotation for the following models: M9530S and M6230S. Use the standard QT number format (e.g., QT followed by a 7-digit sequence based on year and month). Include unit prices, quantities, and total amounts.

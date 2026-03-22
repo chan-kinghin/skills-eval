@@ -1,0 +1,1 @@
+re:(?i)(wechat|微信|mp\.weixin|公众号)

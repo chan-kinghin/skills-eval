@@ -1,0 +1,1 @@
+We have multiple POs from the same buyer that need to be consolidated into one shipment. Explain how to match and map each PO number to its corresponding sub-orders, and how the CI/PL should reflect the PO matching logic for customs clearance.

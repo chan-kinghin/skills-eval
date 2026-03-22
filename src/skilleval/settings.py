@@ -9,15 +9,18 @@ class Settings:
     """Runtime settings with SKILLEVAL_* env var overrides."""
 
     def __init__(self) -> None:
-        self.max_retries: int = int(os.environ.get("SKILLEVAL_MAX_RETRIES", "3"))
-        self.backoff_base: list[int] = [1, 2, 4]
+        self.max_retries: int = int(os.environ.get("SKILLEVAL_MAX_RETRIES", "5"))
+        self.backoff_base: list[int] = [1, 3, 8, 15, 25]
         self.circuit_breaker_threshold: int = int(
             os.environ.get("SKILLEVAL_CIRCUIT_BREAKER_THRESHOLD", "5")
         )
-        self.max_per_provider: int = int(os.environ.get("SKILLEVAL_MAX_PER_PROVIDER", "5"))
+        self.max_per_provider: int = int(os.environ.get("SKILLEVAL_MAX_PER_PROVIDER", "3"))
         self.max_global: int = int(os.environ.get("SKILLEVAL_MAX_GLOBAL", "20"))
-        self.rate_initial: float = float(os.environ.get("SKILLEVAL_RATE_INITIAL", "5.0"))
+        self.rate_initial: float = float(os.environ.get("SKILLEVAL_RATE_INITIAL", "2.0"))
         self.rate_min: float = float(os.environ.get("SKILLEVAL_RATE_MIN", "0.2"))
+        self.engine_rate_limit_retries: int = int(
+            os.environ.get("SKILLEVAL_RATE_LIMIT_RETRIES", "2")
+        )
 
         backoff_env = os.environ.get("SKILLEVAL_BACKOFF_BASE")
         if backoff_env:

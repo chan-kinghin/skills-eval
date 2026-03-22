@@ -1,0 +1,1 @@
+re:(?i)(feat.*新功能|fix.*修复|commit.*type|提交.*类型)

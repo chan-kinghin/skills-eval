@@ -51,6 +51,15 @@
   env_key: ZHIPU_API_KEY
   context_window: 131072
 
+# Turbo — GLM-5 variant optimized for agentic/tool-use, 200K context
+- name: glm-5-turbo
+  provider: zhipu
+  endpoint: https://api.z.ai/api/paas/v4
+  input_cost_per_m: 0.50
+  output_cost_per_m: 1.60
+  env_key: ZHIPU_API_KEY
+  context_window: 204800
+
 # Mid — Previous-gen flagship, still very capable for document processing
 - name: glm-4.5
   provider: zhipu
@@ -144,7 +153,7 @@
 # Frontier — DeepSeek's general-purpose chat model, very cost-effective
 - name: deepseek-chat
   provider: deepseek
-  endpoint: https://api.deepseek.com/v1/chat/completions
+  endpoint: https://api.deepseek.com/v1
   input_cost_per_m: 0.14
   output_cost_per_m: 0.28
   env_key: DEEPSEEK_API_KEY
@@ -153,7 +162,7 @@
 # Reasoning — DeepSeek's reasoning model with chain-of-thought
 - name: deepseek-reasoner
   provider: deepseek
-  endpoint: https://api.deepseek.com/v1/chat/completions
+  endpoint: https://api.deepseek.com/v1
   input_cost_per_m: 0.55
   output_cost_per_m: 2.19
   env_key: DEEPSEEK_API_KEY

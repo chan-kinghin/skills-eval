@@ -1,0 +1,1 @@
+re:(?i)(commercial\s*invoice|packing.*list|箱单|发票)

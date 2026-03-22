@@ -11,6 +11,7 @@ from aioresponses import aioresponses
 
 from skilleval.client import ApiError, ModelClient, RateLimitError, TimeoutError
 from skilleval.models import ChatResponse, ModelEntry, TaskConfig
+import skilleval.settings as _settings_mod
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────
@@ -170,6 +171,8 @@ class TestTimeoutHandling:
     @patch.object(ModelClient, "_backoff", new=_noop_backoff)
     async def test_timeout_raises_after_retries(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("TEST_API_KEY", "sk-test-key")
+        monkeypatch.setenv("SKILLEVAL_MAX_RETRIES", "3")
+        _settings_mod._settings = None  # reset singleton to pick up env override
         model = _make_model()
         config = _make_config(timeout=1)
         messages = [{"role": "user", "content": "hello"}]
@@ -181,6 +184,7 @@ class TestTimeoutHandling:
             async with ModelClient() as client:
                 with pytest.raises(TimeoutError, match="timed out"):
                     await client.chat_completion(model, messages, config)
+        _settings_mod._settings = None  # cleanup
 
 
 class TestEmptyResponseRetry:
@@ -232,8 +236,11 @@ class TestMaxRetriesExhausted:
     """3x 429 exhausts retries and raises RateLimitError."""
 
     @patch.object(ModelClient, "_backoff", new=_noop_backoff)
+    @patch.object(ModelClient, "_backoff_429", new=_noop_backoff)
     async def test_three_429s_raises_rate_limit_error(self, monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setenv("TEST_API_KEY", "sk-test-key")
+        monkeypatch.setenv("SKILLEVAL_MAX_RETRIES", "3")
+        _settings_mod._settings = None  # reset singleton to pick up env override
         model = _make_model()
         config = _make_config()
         messages = [{"role": "user", "content": "hello"}]
@@ -245,6 +252,7 @@ class TestMaxRetriesExhausted:
             async with ModelClient() as client:
                 with pytest.raises(RateLimitError, match="Rate limited"):
                     await client.chat_completion(model, messages, config)
+        _settings_mod._settings = None  # cleanup
 
 
 class TestAdhocModelApiKey:

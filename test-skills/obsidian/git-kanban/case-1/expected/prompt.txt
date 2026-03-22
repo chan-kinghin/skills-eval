@@ -1,0 +1,1 @@
+re:(?i)(kanban.*plugin|kanban-plugin.*board|看板)

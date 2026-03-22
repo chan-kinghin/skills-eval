@@ -118,7 +118,8 @@ class ModelClient:
                             logger.warning("Retry-After header: %.1fs", retry_after_secs)
                             await asyncio.sleep(retry_after_secs)
                             continue
-                        await self._backoff(attempt)
+                        # 429-specific longer backoff (2x normal)
+                        await self._backoff_429(attempt)
                         continue
 
                     if resp.status >= 500:
@@ -246,12 +247,17 @@ class ModelClient:
 
     async def _backoff(self, attempt: int) -> None:
         """Exponential backoff with jitter."""
-        import asyncio
-
         base = self._backoff_base[min(attempt, len(self._backoff_base) - 1)]
         jitter = random.uniform(0, base * 0.5)
         duration = base + jitter
         logger.warning("Backing off %.1fs before retry (attempt %d)", duration, attempt + 1)
+        await asyncio.sleep(duration)
+
+    async def _backoff_429(self, attempt: int) -> None:
+        """Longer backoff specifically for 429 rate limits (2x normal)."""
+        base = self._backoff_base[min(attempt, len(self._backoff_base) - 1)]
+        duration = base * 2 + random.uniform(0, base)
+        logger.warning("Rate-limit backoff %.1fs before retry (attempt %d)", duration, attempt + 1)
         await asyncio.sleep(duration)
 
 

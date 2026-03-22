@@ -1,0 +1,1 @@
+re:(?i)(tempered\s*glass|silicone|液态硅胶|钢化玻璃)
